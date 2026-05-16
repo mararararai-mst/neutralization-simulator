@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中和シミュレーション｜中3理科 酸・アルカリと中和</title>
+<meta property="og:title" content="中和シミュレーション｜中3理科">
+<meta property="og:description" content="HCl⇔NaOH の2モード。1滴で陽イオン+陰イオンが入り、H⁺とOH⁻が出会うと水に。BTB色＋4種イオン棒グラフ＋加え過ぎでアルカリ性まで体験できる教材。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://mararararai-mst.github.io/neutralization-simulator/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚗️%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&family=Kaisei+Decol:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.4/p5.min.js"></script>
+<style>
+:root {
+  --bg: #FAF6E8;
+  --paper: #FFFBF0;
+  --ink: #3A3530;
+  --accent: #D97A4B;
+  --accent2: #4A7BAA;
+  --ion-h:  #E07A6A;   /* H+ 赤 */
+  --ion-na: #E8A040;   /* Na+ 橙 */
+  --ion-oh: #5FA8D8;   /* OH- 青 */
+  --ion-cl: #6FB89A;   /* Cl- 緑 */
+  --grid: rgba(180, 160, 120, 0.12);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'M PLUS Rounded 1c', system-ui, sans-serif;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  min-height: 100vh;
+}
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 6px 20px 16px;
+}
+header.title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+  border-bottom: 2px dashed var(--accent);
+  padding-bottom: 2px;
+}
+header.title h1 {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+header.title .sub {
+  font-size: 13px;
+  color: #8a7a60;
+  font-family: 'Kaisei Decol', serif;
+}
+.explainer-toggles {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.explainer-toggle-btn {
+  background: #fff;
+  border: 2px solid;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.explainer-toggle-btn.minus { border-color: var(--accent2); color: var(--accent2); box-shadow: 2px 2px 0 var(--accent2); }
+.explainer-toggle-btn.plus { border-color: var(--accent); color: var(--accent); box-shadow: 2px 2px 0 var(--accent); }
+.explainer-toggle-btn:hover { transform: translate(-1px, -1px); }
+.explainer-toggle-btn.minus.active { background: var(--accent2); color: #fff; }
+.explainer-toggle-btn.plus.active { background: var(--accent); color: #fff; }
+
+/* ===== stage（canvas + 右サイドバー） ===== */
+.stage-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-top: 6px;
+}
+.stage-row > .stage {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 4px;
+  box-shadow: 0 3px 10px rgba(120, 100, 80, 0.08);
+  border: 2px solid #EADFC4;
+  position: relative;
+}
+.stage-row > .sidebar {
+  width: 240px;
+  flex: 0 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#canvas-host {
+  width: 100%;
+  display: block;
+}
+
+/* ===== overlay-explainer ===== */
+.overlay-explainer {
+  position: absolute;
+  top: 14px;
+  width: 320px;
+  max-width: 50%;
+  max-height: calc(100% - 28px);
+  background: rgba(255, 251, 240, 0.97);
+  border: 2px solid #EADFC4;
+  border-radius: 14px;
+  padding: 14px 16px 14px 16px;
+  display: none;
+  z-index: 10;
+  overflow-y: auto;
+  box-shadow: 0 6px 20px rgba(120, 100, 80, 0.18);
+  backdrop-filter: blur(2px);
+}
+.overlay-explainer.minus { border-left: 5px solid var(--accent2); left: 14px; }
+.overlay-explainer.plus { border-left: 5px solid var(--accent); right: 14px; }
+.overlay-explainer.show { display: block; animation: pop-in 0.18s ease-out; }
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.overlay-explainer .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #8a7a60;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.overlay-explainer .close-btn:hover { color: #444; }
+.overlay-explainer h3 {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.overlay-explainer.minus h3 { color: var(--accent2); }
+.overlay-explainer.plus h3 { color: var(--accent); }
+.overlay-explainer .panel-rx {
+  background: #FFFBF0;
+  border-left: 3px solid;
+  padding: 6px 10px;
+  margin: 8px 0;
+  font-family: 'Kaisei Decol', serif;
+  font-size: 13.5px;
+  text-align: center;
+}
+.overlay-explainer.minus .panel-rx { border-color: var(--accent2); }
+.overlay-explainer.plus .panel-rx { border-color: var(--accent); }
+.textbook-body {
+  line-height: 1.85;
+  font-size: 13px;
+  margin: 6px 0;
+}
+.textbook-body p { margin: 6px 0; }
+.overlay-explainer .sub-detail {
+  margin-top: 8px;
+  border-top: 1px dashed #d0c0a0;
+  padding-top: 6px;
+}
+.overlay-explainer .sub-detail summary {
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  color: #8a6a40;
+  user-select: none;
+  list-style: none;
+}
+.overlay-explainer .sub-detail summary::-webkit-details-marker { display: none; }
+.overlay-explainer .sub-detail summary::before { content: '▶ '; font-size: 10px; }
+.overlay-explainer .sub-detail[open] summary::before { content: '▼ '; }
+.overlay-explainer .sub-detail .detail-body {
+  padding: 6px 0 0 0;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.overlay-explainer .sub-detail .detail-body p { margin: 4px 0; }
+.overlay-explainer .sub-detail .detail-body .key-point {
+  background: #FFEBD0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin: 4px 0;
+  font-size: 11px;
+}
+
+/* ===== サイドバー：棒グラフ ===== */
+.sidebar .ion-bars-card {
+  background: var(--paper);
+  border: 2px solid #EADFC4;
+  border-radius: 12px;
+  padding: 10px 10px 8px 10px;
+  box-shadow: 0 3px 10px rgba(120, 100, 80, 0.08);
+}
+.sidebar .ion-bars-card h3 {
+  margin: 0 0 8px 0;
+  font-size: 12.5px;
+  color: #6a5a40;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+.ion-bars {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 6px;
+  align-items: end;
+  height: 180px;
+}
+.bar-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 3px;
+}
+.bar-num {
+  font-size: 13px;
+  font-weight: 800;
+  color: #5a4a30;
+  font-family: 'Kaisei Decol', serif;
+  height: 16px;
+}
+.bar-track {
+  flex: 1;
+  width: 100%;
+  background:
+    repeating-linear-gradient(
+      to top,
+      transparent 0,
+      transparent 14px,
+      rgba(0, 0, 0, 0.08) 14px,
+      rgba(0, 0, 0, 0.08) 15px
+    ),
+    #F0E6CC;
+  border: 1.5px solid #BFAE85;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  min-height: 80px;
+}
+.bar-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  transition: height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  border-top: 2px solid rgba(0,0,0,0.18);
+}
+.bar-fill.hp { background: var(--ion-h); }
+.bar-fill.clm { background: var(--ion-cl); }
+.bar-fill.ohm { background: var(--ion-oh); }
+.bar-fill.nap { background: var(--ion-na); }
+.bar-label {
+  font-size: 13px;
+  font-weight: 800;
+  font-family: 'Kaisei Decol', serif;
+  height: 18px;
+}
+.bar-label.hp { color: var(--ion-h); }
+.bar-label.clm { color: #2A8068; }
+.bar-label.ohm { color: var(--accent2); }
+.bar-label.nap { color: #B07A20; }
+
+.sidebar .status-card {
+  background: var(--paper);
+  border: 2px solid #EADFC4;
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #5a4a30;
+}
+.sidebar .status-card .ph-pill {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-weight: 800;
+  color: #fff;
+  margin-left: 4px;
+  font-size: 13px;
+}
+.sidebar .status-card .ph-pill.acid { background: #C8A030; }
+.sidebar .status-card .ph-pill.neutral { background: #5AA070; }
+.sidebar .status-card .ph-pill.alkali { background: #4A7BAA; }
+.sidebar .status-card .drops-info {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: #8a7a60;
+}
+
+/* ===== controls ===== */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  background: var(--paper);
+  border-radius: 12px;
+  padding: 8px 12px;
+  border: 2px solid #EADFC4;
+}
+.mode-toggle {
+  display: inline-flex;
+  background: #F0E6CC;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+.mode-toggle button {
+  background: transparent;
+  border: none;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #8a7a60;
+}
+.mode-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(217, 122, 75, 0.3);
+}
+.btn {
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--ink); }
+.btn:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 var(--ink); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 2px 2px 0 #8C4A28; }
+.btn.primary:hover { box-shadow: 3px 3px 0 #8C4A28; }
+.btn.primary:active { box-shadow: 1px 1px 0 #8C4A28; }
+.btn.auto-btn { background: #FFF6E6; border-color: #BFAE85; color: #8C5A1A; box-shadow: 2px 2px 0 #BFAE85; }
+.btn.auto-btn:hover { box-shadow: 3px 3px 0 #BFAE85; }
+.btn.auto-btn.active { background: #5FA8D8; border-color: #2D6FA0; color: #fff; box-shadow: 2px 2px 0 #2D6FA0; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: 2px 2px 0 var(--ink); }
+.slider-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #6a5a40;
+}
+input[type="range"] {
+  width: 130px;
+  accent-color: var(--accent);
+}
+
+/* ===== bottom info ===== */
+.bottom-info {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 10px;
+}
+.bottom-info .card {
+  background: var(--paper);
+  border: 2px solid #EADFC4;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #5a4a30;
+}
+.bottom-info .card h3 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  color: #6a5a40;
+}
+.bottom-info .rx {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 14px;
+  background: #FFFBF0;
+  border-left: 4px solid var(--accent2);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin: 4px 0;
+  text-align: center;
+}
+.ion-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ion-legend .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: #FFFBF0;
+  border: 1.5px solid #EADFC4;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-family: 'Kaisei Decol', serif;
+}
+.ion-legend .chip .dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+@media (max-width: 980px) {
+  .stage-row { flex-direction: column; }
+  .stage-row > .sidebar { width: 100%; flex: 1 1 auto; }
+  .sidebar .ion-bars { height: 140px; }
+  .bottom-info { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .wrap { padding: 6px 8px 16px; }
+  header.title { flex-wrap: wrap; gap: 4px; }
+  header.title h1 { font-size: 16px; }
+  header.title .sub { font-size: 10px; }
+  .explainer-toggles { flex-direction: column; gap: 4px; }
+  .explainer-toggle-btn { width: 100%; font-size: 12px; padding: 7px 10px; }
+  .controls { flex-direction: column; align-items: stretch; }
+  .mode-toggle { width: 100%; }
+  .mode-toggle button { flex: 1; }
+  .btn { width: 100%; box-sizing: border-box; }
+  .slider-wrap { justify-content: space-between; width: 100%; }
+  input[type="range"] { flex: 1; width: auto; min-width: 0; }
+  .overlay-explainer {
+    position: fixed !important;
+    top: 4% !important;
+    left: 4% !important;
+    right: 4% !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 92vh !important;
+    z-index: 1000;
+  }
+  .overlay-explainer.plus { left: 4% !important; right: 4% !important; }
+}
+sub, sup { font-size: 0.72em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="title">
+    <h1>⚗️ 中和シミュレーション</h1>
+    <span class="sub">中3 理科 ／ 酸・アルカリと中和（H⁺ + OH⁻ → H₂O）</span>
+  </header>
+
+  <div class="explainer-toggles">
+    <button class="explainer-toggle-btn minus" id="toggle-minus">📘 中和の本質</button>
+    <button class="explainer-toggle-btn plus" id="toggle-plus">📊 グラフの読み方</button>
+  </div>
+
+  <div class="stage-row">
+    <div class="stage">
+      <div id="canvas-host"></div>
+
+      <div class="overlay-explainer minus" id="overlay-minus">
+        <button class="close-btn" data-overlay="minus" aria-label="閉じる">×</button>
+        <h3>📘 中和とは何が起きているか</h3>
+        <div class="textbook-body">
+          <p>酸の <strong style="color:var(--ion-h)">H⁺</strong>（水素イオン）と、アルカリの <strong style="color:var(--ion-oh)">OH⁻</strong>（水酸化物イオン）が出会うと、結合して <strong>水（H₂O）</strong> になります。</p>
+          <p>この反応のことを <strong>中和</strong>といいます。</p>
+        </div>
+        <div class="panel-rx">H⁺ + OH⁻ → H₂O</div>
+        <div class="textbook-body">
+          <p>シミュ画面では、H⁺ と OH⁻ が近づくと <strong>光って水になって消える</strong>アニメで表現しています。</p>
+        </div>
+        <details class="sub-detail">
+          <summary>もっと詳しく：塩（えん）って？</summary>
+          <div class="detail-body">
+            <p>H⁺ と OH⁻ は水になって消えますが、<strong style="color:var(--ion-cl)">Cl⁻</strong> と <strong style="color:var(--ion-na)">Na⁺</strong> はそのまま残っています。</p>
+            <p>HCl + NaOH の中和でできた水溶液を蒸発させると、<strong>塩化ナトリウム（NaCl）の結晶</strong>が出てきます。これを <strong>塩（えん）</strong> といいます。</p>
+            <p>反応式: HCl + NaOH → NaCl + H₂O</p>
+            <div class="key-point">📍 中和では水＋塩ができる。塩の正体はCl⁻とNa⁺のペア。</div>
+          </div>
+        </details>
+        <details class="sub-detail">
+          <summary>シミュの注意点（電離について）</summary>
+          <div class="detail-body">
+            <p>実際の HCl や NaOH は、水に溶けた時点で <strong>すべて電離して</strong> イオンになっています。</p>
+            <p>このシミュレーションでは「1滴ずつ追える」よう、滴下の瞬間に電離する演出にしてあります。</p>
+          </div>
+        </details>
+      </div>
+
+      <div class="overlay-explainer plus" id="overlay-plus">
+        <button class="close-btn" data-overlay="plus" aria-label="閉じる">×</button>
+        <h3>📊 4本の棒グラフの読み方</h3>
+        <div class="textbook-body">
+          <p><strong>反応するイオン</strong>（H⁺ と OH⁻）— ぶつかって水になって消えるので、両方とも数が減っていく。</p>
+          <p><strong>反応しないイオン</strong>（Cl⁻ と Na⁺）— 滴下した分だけ増えて、減らない。最後まで残る。</p>
+        </div>
+        <details class="sub-detail" open>
+          <summary>HClビーカー + NaOHを加える場合</summary>
+          <div class="detail-body">
+            <p>スタート: H⁺ ×5、Cl⁻ ×5 （酸性・黄色）</p>
+            <p>1滴ごと: Na⁺ +1、OH⁻ +1 がビーカーに加わる<br>
+            → OH⁻ は H⁺ と出会って水になり、H⁺と OH⁻ がペアで減る<br>
+            → Cl⁻ と Na⁺ はそのまま増えていく</p>
+            <p>中性: H⁺ = 0、OH⁻ = 0、Cl⁻ = Na⁺ = 5（緑色）</p>
+            <p>加え過ぎ: もう中和の相手（H⁺）がいないので、OH⁻ が余って増えていく（青色）</p>
+            <div class="key-point">📍 プリント①の⑤〜⑧で書くグラフはこの動き。</div>
+          </div>
+        </details>
+        <details class="sub-detail">
+          <summary>NaOHビーカー + HClを加える場合</summary>
+          <div class="detail-body">
+            <p>スタート: Na⁺ ×5、OH⁻ ×5 （アルカリ性・青色）</p>
+            <p>1滴ごと: H⁺ +1、Cl⁻ +1 が加わる</p>
+            <p>OH⁻ と H⁺ がペアで減り、Cl⁻ と Na⁺ がそのまま増える。</p>
+            <p>中性を越えると、相手のいない H⁺ が余って酸性（黄色）になる。</p>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <aside class="sidebar">
+      <div class="ion-bars-card">
+        <h3>🧮 イオンの数</h3>
+        <div class="ion-bars">
+          <div class="bar-row">
+            <span class="bar-num" id="num-hp">5</span>
+            <div class="bar-track"><div class="bar-fill hp" id="bar-hp"></div></div>
+            <span class="bar-label hp">H⁺</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-num" id="num-clm">5</span>
+            <div class="bar-track"><div class="bar-fill clm" id="bar-clm"></div></div>
+            <span class="bar-label clm">Cl⁻</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-num" id="num-ohm">0</span>
+            <div class="bar-track"><div class="bar-fill ohm" id="bar-ohm"></div></div>
+            <span class="bar-label ohm">OH⁻</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-num" id="num-nap">0</span>
+            <div class="bar-track"><div class="bar-fill nap" id="bar-nap"></div></div>
+            <span class="bar-label nap">Na⁺</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="status-card">
+        <div>液性: <span class="ph-pill acid" id="ph-pill">酸性</span></div>
+        <div>BTB色: <span id="btb-name">黄</span></div>
+        <div class="drops-info">滴下回数: <span id="drop-count">0</span> 滴</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="controls">
+    <div class="mode-toggle" role="tablist" aria-label="モード">
+      <button id="mode-hcl" class="active" role="tab" aria-selected="true">🧪 HCl + NaOH</button>
+      <button id="mode-naoh" role="tab" aria-selected="false">🧪 NaOH + HCl</button>
+    </div>
+    <button id="drop-btn" class="btn primary">💧 NaOHを1滴 加える</button>
+    <button id="auto-btn" class="btn auto-btn">⏩ 連続で加える</button>
+    <button id="reset-btn" class="btn">↻ はじめに戻す</button>
+    <div class="slider-wrap">
+      <span>速さ</span>
+      <input type="range" id="speed" min="0.4" max="1.6" step="0.2" value="0.8">
+      <span id="speed-label">×0.8</span>
+    </div>
+  </div>
+
+  <div class="bottom-info">
+    <div class="card">
+      <h3>📘 中和の反応式</h3>
+      <div class="rx">H⁺ + OH⁻ → H₂O</div>
+      <p>酸の H⁺ とアルカリの OH⁻ が出会うと水になる。これが「中和」。中和したあと残ったイオン（Cl⁻ と Na⁺）からは <strong>塩</strong>（NaCl）ができる。</p>
+    </div>
+    <div class="card">
+      <h3>🎨 イオンの色（凡例）</h3>
+      <div class="ion-legend">
+        <span class="chip"><span class="dot" style="background:var(--ion-h)"></span>H⁺</span>
+        <span class="chip"><span class="dot" style="background:var(--ion-cl)"></span>Cl⁻</span>
+        <span class="chip"><span class="dot" style="background:var(--ion-oh)"></span>OH⁻</span>
+        <span class="chip"><span class="dot" style="background:var(--ion-na)"></span>Na⁺</span>
+        <span class="chip"><span class="dot" style="background:#cfe7f5;border:1px solid #8ab5c7"></span>H₂O</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 中和シミュレーション (p5.js) =====
+
+// --- 状態 ---
+let mode = 'hcl-base';   // 'hcl-base' or 'naoh-base'
+let particles = [];      // 液中イオン群
+let drops = [];          // 落下中の滴
+let ionizing = [];       // 着水→電離中（particlesに編入されるまで）
+let reacting = [];       // H⁺+OH⁻→H₂O アニメ中
+let waters = [];         // 生成済みH₂O（演出のみ、カウント外）
+let counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0 };
+let btbLerp = 1;         // -1(青) .. 0(緑) .. +1(黄)
+let isDropping = false;
+let autoDrop = false;
+let autoDropCooldown = 0;
+let speedMul = 0.8;
+let dropTotalCount = 0;
+let particleIdCounter = 0;
+
+let canvasW = 800, canvasH = 500;
+
+// --- 定数 ---
+const BAR_MAX = 14;          // 棒グラフ上限値
+const REACT_DURATION = 36;   // 中和アニメフレーム数（0.6秒）
+const IONIZE_DURATION = 20;  // 電離フェードイン
+const DROP_SPEED = 0.028;    // 滴の落下速度（t/フレーム）
+
+// 正規化レイアウト
+const LAYOUT = {
+  pipetteX: 0.40,
+  pipetteTipY: 0.12,
+  beakerX: 0.10,
+  beakerY: 0.22,
+  beakerW: 0.60,
+  beakerH: 0.72,
+  liquidTopOffset: 0.10,    // beakerY + 0.10 = 液面
+  liquidPad: 0.025,         // ビーカー内壁から液面端までの余白
+};
+
+// 色定数（p5.color() は setup() 後でないと作れないので draw 内で都度lerp）
+const BTB_ACID    = [255, 230, 90];
+const BTB_NEUTRAL = [140, 210, 130];
+const BTB_ALKALI  = [110, 170, 230];
+const ION_COLORS = {
+  'H+':  [224, 122, 106],
+  'Na+': [232, 160, 64],
+  'OH-': [95, 168, 216],
+  'Cl-': [111, 184, 154],
+};
+
+// --- 初期化 ---
+function setup() {
+  const host = document.getElementById('canvas-host');
+  const w = Math.min(900, host.clientWidth || 900);
+  const h = Math.round(w * canvasRatio());
+  canvasW = w; canvasH = h;
+  const c = createCanvas(w, h);
+  c.parent('canvas-host');
+  frameRate(60);
+  initStateForMode();
+  bindUI();
+  updateGraphDOM();
+}
+
+function canvasRatio() {
+  return (window.innerWidth < 600) ? 0.95 : 0.55;
+}
+
+function windowResized() {
+  const host = document.getElementById('canvas-host');
+  const w = Math.min(900, host.clientWidth || 900);
+  const h = Math.round(w * canvasRatio());
+  canvasW = w; canvasH = h;
+  resizeCanvas(w, h);
+  // 既存粒子は新サイズに収まるよう正規化座標を再計算
+  for (const p of particles) {
+    p.x = constrain(p.x, liqLeft() + 8, liqRight() - 8);
+    p.y = constrain(p.y, liqTop() + 8, liqBottom() - 8);
+  }
+}
+
+// --- レイアウト計算 ---
+function liqLeft()   { return (LAYOUT.beakerX + LAYOUT.liquidPad) * canvasW; }
+function liqRight()  { return (LAYOUT.beakerX + LAYOUT.beakerW - LAYOUT.liquidPad) * canvasW; }
+function liqTop()    { return (LAYOUT.beakerY + LAYOUT.liquidTopOffset) * canvasH; }
+function liqBottom() { return (LAYOUT.beakerY + LAYOUT.beakerH - 0.04) * canvasH; }
+function liqWidth()  { return liqRight() - liqLeft(); }
+function liqHeight() { return liqBottom() - liqTop(); }
+function pipetteTipPos() {
+  return { x: LAYOUT.pipetteX * canvasW, y: LAYOUT.pipetteTipY * canvasH };
+}
+function liquidSurfaceY() { return liqTop(); }
+
+// --- 状態初期化 ---
+function initStateForMode() {
+  particles = [];
+  drops = [];
+  ionizing = [];
+  reacting = [];
+  waters = [];
+  dropTotalCount = 0;
+  if (mode === 'hcl-base') {
+    counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0 };
+    btbLerp = 1;
+    // 初期粒子配置
+    for (let i = 0; i < 5; i++) particles.push(makeParticle('H+'));
+    for (let i = 0; i < 5; i++) particles.push(makeParticle('Cl-'));
+  } else {
+    counts = { Hp: 0, OHm: 5, Clm: 0, Nap: 5 };
+    btbLerp = -1;
+    for (let i = 0; i < 5; i++) particles.push(makeParticle('OH-'));
+    for (let i = 0; i < 5; i++) particles.push(makeParticle('Na+'));
+  }
+  // 棒グラフ即時反映
+  updateGraphDOM();
+  updateStatusDOM();
+}
+
+function makeParticle(type, opts = {}) {
+  const x = opts.x !== undefined ? opts.x : random(liqLeft() + 10, liqRight() - 10);
+  const y = opts.y !== undefined ? opts.y : random(liqTop() + 10, liqBottom() - 10);
+  return {
+    id: ++particleIdCounter,
+    type,
+    x, y,
+    vx: random(-0.3, 0.3),
+    vy: random(-0.2, 0.2),
+    phase: random(TWO_PI),
+    born: frameCount,
+    fadeIn: opts.fadeIn !== undefined ? opts.fadeIn : 1,
+    fadeOut: 0,                  // 0..1 (1で中和開始)
+    reactPartner: null,
+  };
+}
+
+// --- メインループ ---
+function draw() {
+  background(255, 251, 240);
+  drawBeakerLiquid();
+  drawBeakerFrame();
+  drawPipette();
+  drawBeakerLabel();
+
+  // 1) 自動滴下
+  if (autoDrop) {
+    autoDropCooldown -= speedMul;
+    if (autoDropCooldown <= 0 && !isDropping && drops.length === 0) {
+      tryStartDrop();
+      autoDropCooldown = 75;
+    }
+  }
+
+  // 2) drops update
+  for (let i = drops.length - 1; i >= 0; i--) {
+    const d = drops[i];
+    d.t += DROP_SPEED * speedMul;
+    if (d.t >= 1) {
+      // 着水 → 電離アニメへ
+      const [cation, anion] = (d.parent === 'NaOH') ? ['Na+', 'OH-'] : ['H+', 'Cl-'];
+      const surfX = LAYOUT.pipetteX * canvasW;
+      const surfY = liquidSurfaceY();
+      ionizing.push(makeIonizing(cation, surfX - 14, surfY + 4));
+      ionizing.push(makeIonizing(anion,  surfX + 14, surfY + 4));
+      // カウントは即時加算（棒グラフはすぐ伸びる）
+      if (cation === 'Na+') counts.Nap++;
+      if (cation === 'H+')  counts.Hp++;
+      if (anion === 'OH-')  counts.OHm++;
+      if (anion === 'Cl-')  counts.Clm++;
+      dropTotalCount++;
+      drops.splice(i, 1);
+      isDropping = false;
+      updateGraphDOM();
+    }
+  }
+
+  // 3) ionizing update（着水点から液中へ拡散しながらフェードイン）
+  for (let i = ionizing.length - 1; i >= 0; i--) {
+    const z = ionizing[i];
+    z.age++;
+    z.x += z.vx;
+    z.y += z.vy;
+    z.vy += 0.05;                 // 軽い重力で液中へ落ちる
+    z.vx *= 0.96;
+    z.vy *= 0.97;
+    // 液中の境界
+    if (z.x < liqLeft() + 8)  { z.x = liqLeft() + 8;  z.vx *= -0.4; }
+    if (z.x > liqRight() - 8) { z.x = liqRight() - 8; z.vx *= -0.4; }
+    if (z.y > liqBottom() - 8){ z.y = liqBottom() - 8; z.vy *= -0.3; }
+    if (z.age >= IONIZE_DURATION) {
+      // particlesに編入
+      particles.push(makeParticle(z.type, { x: z.x, y: z.y, fadeIn: 1 }));
+      ionizing.splice(i, 1);
+    }
+  }
+
+  // 4) particles update（ブラウン運動）
+  for (const p of particles) {
+    p.phase += 0.04;
+    p.vx += random(-0.06, 0.06);
+    p.vy += random(-0.06, 0.06);
+    p.vx *= 0.94;
+    p.vy *= 0.94;
+    p.vx = constrain(p.vx, -0.7, 0.7);
+    p.vy = constrain(p.vy, -0.7, 0.7);
+    p.x += p.vx * speedMul;
+    p.y += p.vy * speedMul;
+    // 軽く中心へ戻す（散らばりすぎ防止）+ 反応相手寄りに集まる傾向
+    const cx = (liqLeft() + liqRight()) / 2;
+    const cy = (liqTop() + liqBottom()) / 2;
+    p.x += (cx - p.x) * 0.0020;
+    p.y += (cy - p.y) * 0.0020;
+    // 壁
+    if (p.x < liqLeft() + 8)   { p.x = liqLeft() + 8;   p.vx *= -0.5; }
+    if (p.x > liqRight() - 8)  { p.x = liqRight() - 8;  p.vx *= -0.5; }
+    if (p.y < liqTop() + 8)    { p.y = liqTop() + 8;    p.vy *= -0.5; }
+    if (p.y > liqBottom() - 8) { p.y = liqBottom() - 8; p.vy *= -0.5; }
+  }
+
+  // 5) 中和判定（最近傍ペア、1フレーム1ペア）
+  detectNeutralization();
+
+  // 6) reacting アニメ進行
+  for (let i = reacting.length - 1; i >= 0; i--) {
+    const r = reacting[i];
+    r.t += (1 / REACT_DURATION) * speedMul;
+    // カウント減算: t が 0.5 を初めて越えた瞬間（光フラッシュの中心）
+    if (!r.countDecremented && r.t >= 0.5) {
+      counts.Hp = Math.max(0, counts.Hp - 1);
+      counts.OHm = Math.max(0, counts.OHm - 1);
+      r.countDecremented = true;
+      updateGraphDOM();
+    }
+    if (r.t >= 1) {
+      // particlesから完全削除
+      particles = particles.filter(p => p.id !== r.hpId && p.id !== r.ohmId);
+      // H₂O 演出粒子を waters[] に追加
+      waters.push({
+        x: r.cx, y: r.cy,
+        vx: random(-0.2, 0.2),
+        vy: random(-0.4, 0),  // ちょい上方向
+        age: 0,
+        life: 240 + Math.floor(random(120)),
+        phase: random(TWO_PI),
+      });
+      reacting.splice(i, 1);
+    }
+  }
+
+  // 7) waters update
+  for (let i = waters.length - 1; i >= 0; i--) {
+    const w = waters[i];
+    w.age++;
+    w.phase += 0.05;
+    w.vx += random(-0.04, 0.04);
+    w.vy += random(-0.04, 0.04);
+    w.vx *= 0.96;
+    w.vy = w.vy * 0.96 + 0.005;  // 微小に下方向の力（最終的に底にゆっくり）
+    w.x += w.vx * speedMul;
+    w.y += w.vy * speedMul;
+    if (w.x < liqLeft() + 8)   { w.x = liqLeft() + 8;   w.vx *= -0.4; }
+    if (w.x > liqRight() - 8)  { w.x = liqRight() - 8;  w.vx *= -0.4; }
+    if (w.y < liqTop() + 8)    { w.y = liqTop() + 8;    w.vy *= -0.4; }
+    if (w.y > liqBottom() - 8) { w.y = liqBottom() - 8; w.vy *= -0.4; }
+    if (w.age > w.life) waters.splice(i, 1);
+  }
+  // waters が増えすぎたら古いものから削除（パフォーマンス保護）
+  if (waters.length > 30) waters.splice(0, waters.length - 30);
+
+  // 8) BTB更新
+  updateBTB();
+
+  // 9) 描画
+  drawWaters();
+  drawParticles();
+  drawIonizing();
+  drawReactingAnim();
+  drawDrops();
+
+  // ステータス
+  updateStatusDOM();
+}
+
+// --- 中和判定 ---
+function detectNeutralization() {
+  if (reacting.length > 4) return;   // 同時アニメ制限
+  const R = liqWidth() * 0.16;
+  const R2 = R * R;
+  const hps = particles.filter(p => p.type === 'H+' && p.fadeOut === 0);
+  const ohs = particles.filter(p => p.type === 'OH-' && p.fadeOut === 0);
+  if (hps.length === 0 || ohs.length === 0) return;
+  let bestPair = null;
+  let bestD = R2;
+  for (const h of hps) {
+    for (const o of ohs) {
+      const dx = h.x - o.x;
+      const dy = h.y - o.y;
+      const d = dx*dx + dy*dy;
+      if (d < bestD) {
+        bestD = d;
+        bestPair = [h, o];
+      }
+    }
+  }
+  if (bestPair) {
+    const [h, o] = bestPair;
+    h.fadeOut = 1; o.fadeOut = 1;
+    h.reactPartner = o.id; o.reactPartner = h.id;
+    reacting.push({
+      hpId: h.id,
+      ohmId: o.id,
+      hpStart: { x: h.x, y: h.y },
+      ohmStart: { x: o.x, y: o.y },
+      cx: (h.x + o.x) / 2,
+      cy: (h.y + o.y) / 2,
+      t: 0,
+      countDecremented: false,
+    });
+  }
+}
+
+// --- BTB ---
+function updateBTB() {
+  const diff = counts.Hp - counts.OHm;
+  let target = constrain(diff / 6, -1, 1);
+  btbLerp += (target - btbLerp) * 0.05;
+}
+function currentLiquidColorRGB() {
+  // btbLerp: -1(青) .. 0(緑) .. +1(黄)
+  let r, g, b;
+  if (btbLerp >= 0) {
+    const t = btbLerp;
+    r = lerp(BTB_NEUTRAL[0], BTB_ACID[0], t);
+    g = lerp(BTB_NEUTRAL[1], BTB_ACID[1], t);
+    b = lerp(BTB_NEUTRAL[2], BTB_ACID[2], t);
+  } else {
+    const t = -btbLerp;
+    r = lerp(BTB_NEUTRAL[0], BTB_ALKALI[0], t);
+    g = lerp(BTB_NEUTRAL[1], BTB_ALKALI[1], t);
+    b = lerp(BTB_NEUTRAL[2], BTB_ALKALI[2], t);
+  }
+  return [r, g, b];
+}
+
+// --- ionizing helper ---
+function makeIonizing(type, x, y) {
+  return {
+    type, x, y,
+    vx: (type === 'Na+' || type === 'H+') ? random(-1.0, -0.2) : random(0.2, 1.0),
+    vy: random(0.2, 0.8),
+    age: 0,
+  };
+}
+
+// ==========================================
+// 描画関数群
+// ==========================================
+
+function drawBeakerLiquid() {
+  // 液体本体
+  const [r, g, b] = currentLiquidColorRGB();
+  noStroke();
+  fill(r, g, b);
+  // 液体の矩形（ビーカー内側）
+  const bx = LAYOUT.beakerX * canvasW;
+  const by = LAYOUT.beakerY * canvasH;
+  const bw = LAYOUT.beakerW * canvasW;
+  const bh = LAYOUT.beakerH * canvasH;
+  const liqY0 = liquidSurfaceY();
+  rect(bx + 4, liqY0, bw - 8, by + bh - 4 - liqY0, 0, 0, 14, 14);
+  // 液面のキラリ
+  fill(255, 255, 255, 50);
+  ellipse(bx + bw * 0.30, liqY0 + 2, bw * 0.18, 4);
+}
+
+function drawBeakerFrame() {
+  const bx = LAYOUT.beakerX * canvasW;
+  const by = LAYOUT.beakerY * canvasH;
+  const bw = LAYOUT.beakerW * canvasW;
+  const bh = LAYOUT.beakerH * canvasH;
+  // ビーカー外形（口のフレア＋本体）
+  stroke(120, 140, 160, 180);
+  strokeWeight(3);
+  noFill();
+  // 注ぎ口部分（左右の小さい外側カーブ）
+  beginShape();
+  vertex(bx - 8, by);
+  vertex(bx, by + 10);
+  vertex(bx, by + bh - 14);
+  bezierVertex(bx, by + bh, bx + 14, by + bh, bx + 14, by + bh);
+  vertex(bx + bw - 14, by + bh);
+  bezierVertex(bx + bw, by + bh, bx + bw, by + bh - 14, bx + bw, by + bh - 14);
+  vertex(bx + bw, by + 10);
+  vertex(bx + bw + 8, by);
+  endShape();
+  // 目盛り
+  stroke(140, 160, 180, 140);
+  strokeWeight(1.5);
+  for (let i = 1; i <= 5; i++) {
+    const yy = by + bh * 0.25 + (bh * 0.55) * (i / 5);
+    const len = (i % 2 === 0) ? 14 : 8;
+    line(bx + bw - 4, yy, bx + bw - 4 - len, yy);
+  }
+}
+
+function drawBeakerLabel() {
+  const bx = LAYOUT.beakerX * canvasW;
+  const by = LAYOUT.beakerY * canvasH;
+  const bw = LAYOUT.beakerW * canvasW;
+  const bh = LAYOUT.beakerH * canvasH;
+  noStroke();
+  fill(90, 78, 60);
+  textAlign(CENTER, TOP);
+  textSize(Math.max(11, canvasW / 80));
+  textStyle(BOLD);
+  const label = (mode === 'hcl-base') ? 'うすい塩酸（HCl水溶液）＋BTB' : '水酸化ナトリウム水溶液（NaOH）＋BTB';
+  text(label, bx + bw / 2, by + bh + 4);
+  textStyle(NORMAL);
+}
+
+function drawPipette() {
+  const tip = pipetteTipPos();
+  const tipX = tip.x;
+  const tipY = tip.y;
+  // ピペット本体（細長い円筒 + ゴム球）
+  const pipBodyW = 18;
+  const pipBodyH = canvasH * 0.10;
+  const bulbR = 14;
+  const bulbCy = tipY - pipBodyH - bulbR;
+  // 液体内容物の色（モードに依存）
+  const tubeColor = (mode === 'hcl-base') ? [110, 170, 230] : [255, 230, 90];  // 入れる側
+  // 連れて入れる試薬名
+  const reagent = (mode === 'hcl-base') ? 'NaOH' : 'HCl';
+  // ゴム球
+  noStroke();
+  fill(232, 200, 90);
+  ellipse(tipX, bulbCy, bulbR * 2, bulbR * 1.7);
+  fill(255, 255, 255, 90);
+  ellipse(tipX - 4, bulbCy - 3, 6, 3);
+  // 円筒
+  fill(255, 255, 255);
+  stroke(140, 140, 140);
+  strokeWeight(1.5);
+  rect(tipX - pipBodyW/2, bulbCy + bulbR * 0.85, pipBodyW, pipBodyH, 4, 4, 0, 0);
+  // 中の液体
+  noStroke();
+  fill(tubeColor[0], tubeColor[1], tubeColor[2], 200);
+  rect(tipX - pipBodyW/2 + 2, bulbCy + bulbR * 0.85 + 6, pipBodyW - 4, pipBodyH - 10, 2);
+  // 先端の細い部分
+  stroke(140, 140, 140);
+  strokeWeight(1.5);
+  fill(255);
+  beginShape();
+  vertex(tipX - pipBodyW/2, bulbCy + bulbR * 0.85 + pipBodyH);
+  vertex(tipX - 2, tipY);
+  vertex(tipX + 2, tipY);
+  vertex(tipX + pipBodyW/2, bulbCy + bulbR * 0.85 + pipBodyH);
+  endShape(CLOSE);
+  // 先端の液
+  noStroke();
+  fill(tubeColor[0], tubeColor[1], tubeColor[2], 220);
+  triangle(tipX - 3, tipY - 4, tipX + 3, tipY - 4, tipX, tipY + 1);
+  // ラベル
+  noStroke();
+  fill(90, 78, 60);
+  textAlign(CENTER, BOTTOM);
+  textSize(Math.max(11, canvasW / 78));
+  textStyle(BOLD);
+  text(reagent, tipX, bulbCy - bulbR - 2);
+  textStyle(NORMAL);
+}
+
+function drawDrops() {
+  for (const d of drops) {
+    const tip = pipetteTipPos();
+    const startX = tip.x;
+    const startY = tip.y + 2;
+    const endY = liquidSurfaceY() - 4;
+    const x = startX;
+    const y = lerp(startY, endY, d.t);
+    const [r, g, b] = (d.parent === 'NaOH') ? [110, 170, 230] : [255, 220, 80];
+    noStroke();
+    fill(r, g, b, 240);
+    // 滴の形（楕円＋先端）
+    ellipse(x, y, 12, 14);
+    triangle(x - 5, y - 4, x + 5, y - 4, x, y - 10);
+    fill(255, 255, 255, 130);
+    ellipse(x - 2, y - 2, 4, 5);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    // fadeOut: 中和開始のフラグ。reactingアニメ側で描画するのでここでは描かない
+    if (p.fadeOut > 0) continue;
+    drawIonAt(p.x, p.y, p.type, 1.0);
+  }
+}
+
+function drawIonizing() {
+  // 着水→電離アニメ中（フェードイン）
+  for (const z of ionizing) {
+    const t = z.age / IONIZE_DURATION;
+    const alpha = t;
+    drawIonAt(z.x, z.y, z.type, alpha);
+  }
+}
+
+function drawReactingAnim() {
+  for (const r of reacting) {
+    const t = r.t;
+    if (t < 0.4) {
+      // フェーズ1: 元の2粒が中心に吸い寄せ
+      const tt = t / 0.4;
+      const hx = lerp(r.hpStart.x, r.cx, tt);
+      const hy = lerp(r.hpStart.y, r.cy, tt);
+      const ox = lerp(r.ohmStart.x, r.cx, tt);
+      const oy = lerp(r.ohmStart.y, r.cy, tt);
+      const alpha = 1 - tt * 0.4;
+      drawIonAt(hx, hy, 'H+', alpha);
+      drawIonAt(ox, oy, 'OH-', alpha);
+    } else if (t < 0.6) {
+      // フェーズ2: 中心で白い光フラッシュ
+      const tt = (t - 0.4) / 0.2;
+      const base = ionRadius();
+      const rad = base * (1.0 + tt * 2.0);
+      const alpha = 255 * (1 - tt);
+      noStroke();
+      fill(255, 255, 220, alpha);
+      ellipse(r.cx, r.cy, rad * 2.6, rad * 2.6);
+      fill(255, 255, 255, alpha * 0.7);
+      ellipse(r.cx, r.cy, rad * 1.4, rad * 1.4);
+    } else {
+      // フェーズ3: H₂O 分子が浮かび上がる
+      const tt = (t - 0.6) / 0.4;
+      drawH2OAt(r.cx, r.cy, tt * 0.7);
+    }
+  }
+}
+
+function drawWaters() {
+  for (const w of waters) {
+    const lifeT = w.age / w.life;
+    const alpha = Math.min(1, (1 - lifeT) * 1.2);
+    const wob = Math.sin(w.phase) * 1.2;
+    drawH2OAt(w.x + wob, w.y, 0.55 * alpha);
+  }
+}
+
+// 個別アイコン描画
+function ionRadius() {
+  return Math.max(11, canvasW * 0.018);
+}
+function drawIonAt(x, y, type, alpha) {
+  const r = ionRadius();
+  const c = ION_COLORS[type];
+  noStroke();
+  // やや暗いふちどり
+  fill(c[0] * 0.8, c[1] * 0.8, c[2] * 0.8, 255 * alpha);
+  ellipse(x, y, r * 2 + 2, r * 2 + 2);
+  fill(c[0], c[1], c[2], 255 * alpha);
+  ellipse(x, y, r * 2, r * 2);
+  // ハイライト
+  fill(255, 255, 255, 100 * alpha);
+  ellipse(x - r * 0.35, y - r * 0.35, r * 0.7, r * 0.5);
+  // ラベル
+  fill(255, 255, 255, 255 * alpha);
+  textAlign(CENTER, CENTER);
+  textSize(r * 0.95);
+  textStyle(BOLD);
+  text(type, x, y + 1);
+  textStyle(NORMAL);
+}
+function drawH2OAt(x, y, alpha) {
+  const r = ionRadius() * 0.85;
+  // 中央の酸素（薄水色）と左右の水素（白）
+  noStroke();
+  // 左右の水素
+  fill(255, 255, 255, 230 * alpha);
+  ellipse(x - r * 0.65, y - r * 0.25, r * 0.9, r * 0.9);
+  ellipse(x + r * 0.65, y - r * 0.25, r * 0.9, r * 0.9);
+  // 中央の酸素
+  fill(180, 220, 240, 240 * alpha);
+  ellipse(x, y + r * 0.15, r * 1.4, r * 1.4);
+  // ラベル
+  fill(60, 90, 120, 240 * alpha);
+  textAlign(CENTER, CENTER);
+  textSize(r * 0.8);
+  textStyle(BOLD);
+  text('H₂O', x, y + r * 0.15);
+  textStyle(NORMAL);
+}
+
+// ==========================================
+// 滴下処理
+// ==========================================
+function tryStartDrop() {
+  if (isDropping) return;
+  if (drops.length > 0) return;
+  // 「最大15粒オーダー」の安全弁
+  if (counts.Hp + counts.OHm + counts.Clm + counts.Nap > 60) return;
+  const parent = (mode === 'hcl-base') ? 'NaOH' : 'HCl';
+  drops.push({ t: 0, parent });
+  isDropping = true;
+}
+
+// ==========================================
+// DOM 更新
+// ==========================================
+function updateGraphDOM() {
+  setBar('hp',  counts.Hp);
+  setBar('clm', counts.Clm);
+  setBar('ohm', counts.OHm);
+  setBar('nap', counts.Nap);
+}
+function setBar(key, val) {
+  const fill = document.getElementById('bar-' + key);
+  const num  = document.getElementById('num-' + key);
+  if (fill) fill.style.height = Math.min(100, (val / BAR_MAX) * 100) + '%';
+  if (num)  num.textContent = val;
+}
+function updateStatusDOM() {
+  const dc = document.getElementById('drop-count');
+  if (dc) dc.textContent = dropTotalCount;
+  // 液性
+  const pillEl = document.getElementById('ph-pill');
+  const btbEl  = document.getElementById('btb-name');
+  if (!pillEl || !btbEl) return;
+  const diff = counts.Hp - counts.OHm;
+  let phText, phClass, btbText;
+  if (diff > 1) {
+    phText = '酸性'; phClass = 'acid'; btbText = '黄';
+  } else if (diff < -1) {
+    phText = 'アルカリ性'; phClass = 'alkali'; btbText = '青';
+  } else {
+    phText = '中性'; phClass = 'neutral'; btbText = '緑';
+  }
+  pillEl.textContent = phText;
+  pillEl.className = 'ph-pill ' + phClass;
+  btbEl.textContent = btbText;
+}
+
+// ==========================================
+// UI バインド
+// ==========================================
+function bindUI() {
+  // モード切替
+  document.getElementById('mode-hcl').addEventListener('click', () => switchMode('hcl-base'));
+  document.getElementById('mode-naoh').addEventListener('click', () => switchMode('naoh-base'));
+  // 1滴ボタン
+  document.getElementById('drop-btn').addEventListener('click', () => {
+    tryStartDrop();
+  });
+  // 自動滴下
+  const autoBtn = document.getElementById('auto-btn');
+  autoBtn.addEventListener('click', () => {
+    autoDrop = !autoDrop;
+    autoBtn.classList.toggle('active', autoDrop);
+    autoBtn.textContent = autoDrop ? '⏸ 連続を止める' : '⏩ 連続で加える';
+    if (autoDrop) autoDropCooldown = 0;
+  });
+  // リセット
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    autoDrop = false;
+    autoBtn.classList.remove('active');
+    autoBtn.textContent = '⏩ 連続で加える';
+    initStateForMode();
+  });
+  // 速度
+  const speedSlider = document.getElementById('speed');
+  const speedLabel = document.getElementById('speed-label');
+  speedSlider.addEventListener('input', () => {
+    speedMul = parseFloat(speedSlider.value);
+    speedLabel.textContent = '×' + speedMul.toFixed(1);
+  });
+  // overlayトグル
+  document.getElementById('toggle-minus').addEventListener('click', () => toggleOverlay('minus'));
+  document.getElementById('toggle-plus').addEventListener('click', () => toggleOverlay('plus'));
+  document.querySelectorAll('.overlay-explainer .close-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const which = b.dataset.overlay;
+      const o = document.getElementById('overlay-' + which);
+      const tg = document.getElementById('toggle-' + which);
+      if (o) o.classList.remove('show');
+      if (tg) tg.classList.remove('active');
+    });
+  });
+}
+function toggleOverlay(which) {
+  const o = document.getElementById('overlay-' + which);
+  const tg = document.getElementById('toggle-' + which);
+  if (!o || !tg) return;
+  const willShow = !o.classList.contains('show');
+  // 他方を閉じる
+  const other = (which === 'minus') ? 'plus' : 'minus';
+  const oOther = document.getElementById('overlay-' + other);
+  const tgOther = document.getElementById('toggle-' + other);
+  if (oOther) oOther.classList.remove('show');
+  if (tgOther) tgOther.classList.remove('active');
+  o.classList.toggle('show', willShow);
+  tg.classList.toggle('active', willShow);
+}
+
+function switchMode(newMode) {
+  if (newMode === mode) return;
+  mode = newMode;
+  document.getElementById('mode-hcl').classList.toggle('active', mode === 'hcl-base');
+  document.getElementById('mode-naoh').classList.toggle('active', mode === 'naoh-base');
+  // 1滴ボタンのラベル更新
+  const dropBtn = document.getElementById('drop-btn');
+  dropBtn.textContent = (mode === 'hcl-base') ? '💧 NaOHを1滴 加える' : '💧 HClを1滴 加える';
+  // 連続滴下も止める
+  autoDrop = false;
+  const autoBtn = document.getElementById('auto-btn');
+  if (autoBtn) {
+    autoBtn.classList.remove('active');
+    autoBtn.textContent = '⏩ 連続で加える';
+  }
+  initStateForMode();
+}
+</script>
+</body>
+</html>
