@@ -688,12 +688,32 @@ let particleIdCounter = 0;
 
 let canvasW = 800, canvasH = 500;
 
-// 折れ線グラフ用：滴下ごとの履歴
+// 折れ線グラフ用：滴下ごとの履歴（理論値）
 // history[i] = { drop: i, Hp, OHm, Clm, Nap }
 let history = [];
-let pendingSnapshot = null;  // 滴下完了後、N フレーム待ってからスナップショット撮影
 // 折れ線グラフ：各イオンの表示ON/OFF
 let lineGraphVisible = { Hp: true, Clm: true, OHm: true, Nap: true };
+
+// 滴下数 n からのイオン数の理論値（プリント①と完全一致のグラフを描くため）
+function expectedCountsAt(dropNo) {
+  if (mode === 'hcl-base') {
+    // 初期 H+=5, Cl-=5; NaOH 1滴で Na++1, OH-+1, そして H+ と中和（H+>=1 のあいだ）
+    return {
+      Hp:  Math.max(0, 5 - dropNo),
+      Clm: 5,
+      OHm: Math.max(0, dropNo - 5),
+      Nap: dropNo,
+    };
+  } else {
+    // 初期 OH-=5, Na+=5; HCl 1滴で H++1, Cl-+1, そして OH- と中和
+    return {
+      Hp:  Math.max(0, dropNo - 5),
+      Clm: dropNo,
+      OHm: Math.max(0, 5 - dropNo),
+      Nap: 5,
+    };
+  }
+}
 
 // --- 定数 ---
 const BAR_MAX = 14;          // 棒グラフ上限値
@@ -777,7 +797,6 @@ function initStateForMode() {
   waters = [];
   dropTotalCount = 0;
   history = [];
-  pendingSnapshot = null;
   if (mode === 'hcl-base') {
     counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0 };
     btbLerp = 1;
@@ -787,8 +806,8 @@ function initStateForMode() {
     btbLerp = -1;
     placeInitialParticles(['OH-', 'Na+']);
   }
-  // 折れ線グラフに「滴下0」の初期スナップショット
-  history.push({ drop: 0, Hp: counts.Hp, OHm: counts.OHm, Clm: counts.Clm, Nap: counts.Nap });
+  // 折れ線グラフに「滴下0」の理論値
+  history.push({ drop: 0, ...expectedCountsAt(0) });
   // 棒グラフ + 折れ線即時反映
   updateGraphDOM();
   drawLineGraph();
@@ -883,23 +902,11 @@ function draw() {
       dropTotalCount++;
       drops.splice(i, 1);
       isDropping = false;
-      // 中和が落ち着いたタイミング (60フレーム後 ≒ 1秒後) でスナップショット
-      pendingSnapshot = { dropNo: dropTotalCount, framesLeft: 60 };
-      updateGraphDOM();
-    }
-  }
-  // スナップショット予約処理：中和が落ち着いた頃に履歴追加
-  if (pendingSnapshot) {
-    pendingSnapshot.framesLeft--;
-    if (pendingSnapshot.framesLeft <= 0) {
-      history.push({
-        drop: pendingSnapshot.dropNo,
-        Hp: counts.Hp, OHm: counts.OHm, Clm: counts.Clm, Nap: counts.Nap,
-      });
-      // 履歴サイズ上限 (~30滴)
+      // 折れ線グラフは「滴下数からの理論値」で確定描画（連打しても歯抜けしない）
+      history.push({ drop: dropTotalCount, ...expectedCountsAt(dropTotalCount) });
       if (history.length > 32) history.shift();
       drawLineGraph();
-      pendingSnapshot = null;
+      updateGraphDOM();
     }
   }
 
