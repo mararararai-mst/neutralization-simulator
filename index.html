@@ -340,7 +340,7 @@ header.title .sub {
 .graph-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 4px;
   justify-content: center;
   margin-top: 4px;
   font-size: 10.5px;
@@ -349,8 +349,20 @@ header.title .sub {
 .graph-legend .lg {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  padding: 2px 7px;
+  background: #FFFBF0;
+  border: 1.5px solid #EADFC4;
+  border-radius: 999px;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.12s, background 0.12s;
+  font-family: inherit;
+  font-size: inherit;
 }
+.graph-legend .lg:hover { background: #F5EDD7; }
+.graph-legend .lg.off { opacity: 0.35; background: #ECE3CC; }
+.graph-legend .lg.off .swatch { background: #C0B89E !important; }
 .graph-legend .swatch {
   width: 14px;
   height: 3px;
@@ -622,11 +634,11 @@ sub, sup { font-size: 0.72em; }
       <div class="line-graph-card">
         <h3>📈 滴下ごとの変化</h3>
         <canvas id="line-graph-canvas"></canvas>
-        <div class="graph-legend">
-          <span class="lg"><span class="swatch" style="background:var(--ion-h)"></span>H⁺</span>
-          <span class="lg"><span class="swatch" style="background:var(--ion-cl)"></span>Cl⁻</span>
-          <span class="lg"><span class="swatch" style="background:var(--ion-oh)"></span>OH⁻</span>
-          <span class="lg"><span class="swatch" style="background:var(--ion-na)"></span>Na⁺</span>
+        <div class="graph-legend" id="graph-legend">
+          <button class="lg" data-key="Hp"  type="button"><span class="swatch" style="background:var(--ion-h)"></span>H⁺</button>
+          <button class="lg" data-key="Clm" type="button"><span class="swatch" style="background:var(--ion-cl)"></span>Cl⁻</button>
+          <button class="lg" data-key="OHm" type="button"><span class="swatch" style="background:var(--ion-oh)"></span>OH⁻</button>
+          <button class="lg" data-key="Nap" type="button"><span class="swatch" style="background:var(--ion-na)"></span>Na⁺</button>
         </div>
       </div>
 
@@ -680,6 +692,8 @@ let canvasW = 800, canvasH = 500;
 // history[i] = { drop: i, Hp, OHm, Clm, Nap }
 let history = [];
 let pendingSnapshot = null;  // 滴下完了後、N フレーム待ってからスナップショット撮影
+// 折れ線グラフ：各イオンの表示ON/OFF
+let lineGraphVisible = { Hp: true, Clm: true, OHm: true, Nap: true };
 
 // --- 定数 ---
 const BAR_MAX = 14;          // 棒グラフ上限値
@@ -1460,7 +1474,7 @@ function drawLineGraph() {
   ctx.fillText('イオンの数', 0, 0);
   ctx.restore();
 
-  // 折れ線4本
+  // 折れ線4本（凡例ボタンでON/OFF切替）
   const lines = [
     { key: 'Hp',  color: getCSSVar('--ion-h')  },
     { key: 'Clm', color: getCSSVar('--ion-cl') },
@@ -1468,6 +1482,7 @@ function drawLineGraph() {
     { key: 'Nap', color: getCSSVar('--ion-na') },
   ];
   for (const ln of lines) {
+    if (!lineGraphVisible[ln.key]) continue;
     ctx.strokeStyle = ln.color;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1547,6 +1562,16 @@ function bindUI() {
     speedMul = parseFloat(speedSlider.value);
     speedLabel.textContent = '×' + speedMul.toFixed(1);
   });
+  // 折れ線グラフ凡例トグル
+  document.querySelectorAll('#graph-legend .lg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key;
+      lineGraphVisible[key] = !lineGraphVisible[key];
+      btn.classList.toggle('off', !lineGraphVisible[key]);
+      drawLineGraph();
+    });
+  });
+
   // overlayトグル
   document.getElementById('toggle-minus').addEventListener('click', () => toggleOverlay('minus'));
   document.getElementById('toggle-plus').addEventListener('click', () => toggleOverlay('plus'));
