@@ -43,7 +43,7 @@ html, body {
 .wrap {
   max-width: 1180px;
   margin: 0 auto;
-  padding: 6px 20px 16px;
+  padding: 4px 20px 8px;
 }
 header.title {
   display: flex;
@@ -104,6 +104,7 @@ header.title .sub {
   box-shadow: 0 3px 10px rgba(120, 100, 80, 0.08);
   border: 2px solid #EADFC4;
   position: relative;
+  align-self: flex-start;        /* sidebar の高さに引き伸ばさない */
 }
 .stage-row > .sidebar {
   width: 240px;
@@ -230,7 +231,7 @@ header.title .sub {
   grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 6px;
   align-items: end;
-  height: 180px;
+  height: 120px;
 }
 .bar-row {
   display: flex;
@@ -292,39 +293,80 @@ header.title .sub {
   background: var(--paper);
   border: 2px solid #EADFC4;
   border-radius: 12px;
-  padding: 8px 10px;
-  font-size: 12.5px;
-  line-height: 1.7;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.6;
   color: #5a4a30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: center;
 }
 .sidebar .status-card .ph-pill {
   display: inline-block;
-  padding: 3px 12px;
+  padding: 2px 10px;
   border-radius: 999px;
   font-weight: 800;
   color: #fff;
-  margin-left: 4px;
-  font-size: 13px;
+  font-size: 12px;
 }
 .sidebar .status-card .ph-pill.acid { background: #C8A030; }
 .sidebar .status-card .ph-pill.neutral { background: #5AA070; }
 .sidebar .status-card .ph-pill.alkali { background: #4A7BAA; }
-.sidebar .status-card .drops-info {
-  margin-top: 6px;
-  font-size: 11.5px;
-  color: #8a7a60;
+
+/* 折れ線グラフ用 */
+.sidebar .line-graph-card {
+  background: var(--paper);
+  border: 2px solid #EADFC4;
+  border-radius: 12px;
+  padding: 8px 10px 6px 10px;
+  box-shadow: 0 3px 10px rgba(120, 100, 80, 0.08);
+}
+.sidebar .line-graph-card h3 {
+  margin: 0 0 4px 0;
+  font-size: 12.5px;
+  color: #6a5a40;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+#line-graph-canvas {
+  width: 100%;
+  height: 110px;
+  display: block;
+  background: #FFFBF0;
+  border-radius: 6px;
+  border: 1px solid #EADFC4;
+}
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  justify-content: center;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-family: 'Kaisei Decol', serif;
+}
+.graph-legend .lg {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.graph-legend .swatch {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
 }
 
 /* ===== controls ===== */
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  margin-top: 8px;
+  margin-top: 6px;
   background: var(--paper);
   border-radius: 12px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border: 2px solid #EADFC4;
 }
 .mode-toggle {
@@ -552,7 +594,7 @@ sub, sup { font-size: 0.72em; }
 
     <aside class="sidebar">
       <div class="ion-bars-card">
-        <h3>🧮 イオンの数</h3>
+        <h3>🧮 今のイオンの数</h3>
         <div class="ion-bars">
           <div class="bar-row">
             <span class="bar-num" id="num-hp">5</span>
@@ -577,10 +619,21 @@ sub, sup { font-size: 0.72em; }
         </div>
       </div>
 
+      <div class="line-graph-card">
+        <h3>📈 滴下ごとの変化</h3>
+        <canvas id="line-graph-canvas"></canvas>
+        <div class="graph-legend">
+          <span class="lg"><span class="swatch" style="background:var(--ion-h)"></span>H⁺</span>
+          <span class="lg"><span class="swatch" style="background:var(--ion-cl)"></span>Cl⁻</span>
+          <span class="lg"><span class="swatch" style="background:var(--ion-oh)"></span>OH⁻</span>
+          <span class="lg"><span class="swatch" style="background:var(--ion-na)"></span>Na⁺</span>
+        </div>
+      </div>
+
       <div class="status-card">
-        <div>液性: <span class="ph-pill acid" id="ph-pill">酸性</span></div>
-        <div>BTB色: <span id="btb-name">黄</span></div>
-        <div class="drops-info">滴下回数: <span id="drop-count">0</span> 滴</div>
+        <span>液性 <span class="ph-pill acid" id="ph-pill">酸性</span></span>
+        <span>BTB <span id="btb-name">黄</span></span>
+        <span>滴下 <span id="drop-count">0</span></span>
       </div>
     </aside>
   </div>
@@ -600,23 +653,6 @@ sub, sup { font-size: 0.72em; }
     </div>
   </div>
 
-  <div class="bottom-info">
-    <div class="card">
-      <h3>📘 中和の反応式</h3>
-      <div class="rx">H⁺ + OH⁻ → H₂O</div>
-      <p>酸の H⁺ とアルカリの OH⁻ が出会うと水になる。これが「中和」。中和したあと残ったイオン（Cl⁻ と Na⁺）からは <strong>塩</strong>（NaCl）ができる。</p>
-    </div>
-    <div class="card">
-      <h3>🎨 イオンの色（凡例）</h3>
-      <div class="ion-legend">
-        <span class="chip"><span class="dot" style="background:var(--ion-h)"></span>H⁺</span>
-        <span class="chip"><span class="dot" style="background:var(--ion-cl)"></span>Cl⁻</span>
-        <span class="chip"><span class="dot" style="background:var(--ion-oh)"></span>OH⁻</span>
-        <span class="chip"><span class="dot" style="background:var(--ion-na)"></span>Na⁺</span>
-        <span class="chip"><span class="dot" style="background:#cfe7f5;border:1px solid #8ab5c7"></span>H₂O</span>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -640,11 +676,16 @@ let particleIdCounter = 0;
 
 let canvasW = 800, canvasH = 500;
 
+// 折れ線グラフ用：滴下ごとの履歴
+// history[i] = { drop: i, Hp, OHm, Clm, Nap }
+let history = [];
+let pendingSnapshot = null;  // 滴下完了後、N フレーム待ってからスナップショット撮影
+
 // --- 定数 ---
 const BAR_MAX = 14;          // 棒グラフ上限値
 const REACT_DURATION = 36;   // 中和アニメフレーム数（0.6秒）
-const IONIZE_DURATION = 20;  // 電離フェードイン
-const DROP_SPEED = 0.028;    // 滴の落下速度（t/フレーム）
+const IONIZE_DURATION = 25;  // 電離フェードイン（長くして遠くまで飛ぶ時間を確保）
+const DROP_SPEED = 0.030;    // 滴の落下速度（t/フレーム）
 
 // 正規化レイアウト
 const LAYOUT = {
@@ -684,7 +725,7 @@ function setup() {
 }
 
 function canvasRatio() {
-  return (window.innerWidth < 600) ? 0.95 : 0.55;
+  return (window.innerWidth < 600) ? 0.95 : 0.42;
 }
 
 function windowResized() {
@@ -698,6 +739,7 @@ function windowResized() {
     p.x = constrain(p.x, liqLeft() + 8, liqRight() - 8);
     p.y = constrain(p.y, liqTop() + 8, liqBottom() - 8);
   }
+  drawLineGraph();
 }
 
 // --- レイアウト計算 ---
@@ -720,26 +762,47 @@ function initStateForMode() {
   reacting = [];
   waters = [];
   dropTotalCount = 0;
+  history = [];
+  pendingSnapshot = null;
   if (mode === 'hcl-base') {
     counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0 };
     btbLerp = 1;
-    // 初期粒子配置
-    for (let i = 0; i < 5; i++) particles.push(makeParticle('H+'));
-    for (let i = 0; i < 5; i++) particles.push(makeParticle('Cl-'));
+    placeInitialParticles(['H+', 'Cl-']);
   } else {
     counts = { Hp: 0, OHm: 5, Clm: 0, Nap: 5 };
     btbLerp = -1;
-    for (let i = 0; i < 5; i++) particles.push(makeParticle('OH-'));
-    for (let i = 0; i < 5; i++) particles.push(makeParticle('Na+'));
+    placeInitialParticles(['OH-', 'Na+']);
   }
-  // 棒グラフ即時反映
+  // 折れ線グラフに「滴下0」の初期スナップショット
+  history.push({ drop: 0, Hp: counts.Hp, OHm: counts.OHm, Clm: counts.Clm, Nap: counts.Nap });
+  // 棒グラフ + 折れ線即時反映
   updateGraphDOM();
+  drawLineGraph();
   updateStatusDOM();
 }
 
+// 初期5×2粒子を液体内にグリッド状に均等配置
+function placeInitialParticles(types) {
+  // 5 粒子ずつ × 2 種類 = 10 粒。横5列・縦2行のグリッドにイオン種をシャッフル配置
+  const cols = 5, rows = 2;
+  const pad = ionRadius() + 6;
+  const xs = [];
+  const ys = [];
+  for (let c = 0; c < cols; c++) xs.push(lerp(liqLeft() + pad, liqRight() - pad, (c + 0.5) / cols));
+  for (let r = 0; r < rows; r++) ys.push(lerp(liqTop() + pad, liqBottom() - pad, (r + 0.5) / rows));
+  // 種ごとに別の行に配置（型A は上の行、型B は下の行）
+  for (let c = 0; c < cols; c++) {
+    const jitterA = { x: random(-12, 12), y: random(-8, 8) };
+    const jitterB = { x: random(-12, 12), y: random(-8, 8) };
+    particles.push(makeParticle(types[0], { x: xs[c] + jitterA.x, y: ys[0] + jitterA.y }));
+    particles.push(makeParticle(types[1], { x: xs[c] + jitterB.x, y: ys[1] + jitterB.y }));
+  }
+}
+
 function makeParticle(type, opts = {}) {
-  const x = opts.x !== undefined ? opts.x : random(liqLeft() + 10, liqRight() - 10);
-  const y = opts.y !== undefined ? opts.y : random(liqTop() + 10, liqBottom() - 10);
+  const pad = ionRadius() + 2;
+  const x = opts.x !== undefined ? opts.x : random(liqLeft() + pad, liqRight() - pad);
+  const y = opts.y !== undefined ? opts.y : random(liqTop() + pad, liqBottom() - pad);
   return {
     id: ++particleIdCounter,
     type,
@@ -767,7 +830,7 @@ function draw() {
     autoDropCooldown -= speedMul;
     if (autoDropCooldown <= 0 && !isDropping && drops.length === 0) {
       tryStartDrop();
-      autoDropCooldown = 75;
+      autoDropCooldown = 55;
     }
   }
 
@@ -776,12 +839,28 @@ function draw() {
     const d = drops[i];
     d.t += DROP_SPEED * speedMul;
     if (d.t >= 1) {
-      // 着水 → 電離アニメへ
+      // 着水 → 既存粒子を外側に押しのける（場所を空ける）
       const [cation, anion] = (d.parent === 'NaOH') ? ['Na+', 'OH-'] : ['H+', 'Cl-'];
       const surfX = LAYOUT.pipetteX * canvasW;
       const surfY = liquidSurfaceY();
-      ionizing.push(makeIonizing(cation, surfX - 14, surfY + 4));
-      ionizing.push(makeIonizing(anion,  surfX + 14, surfY + 4));
+      // 着水点付近の既存粒子に外向き衝撃を与える（液面に円形の波紋のように）
+      const splashR = liqWidth() * 0.30;
+      for (const p of particles) {
+        if (p.fadeOut > 0) continue;
+        const dx = p.x - surfX;
+        const dy = p.y - surfY;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < splashR * splashR && d2 > 1) {
+          const dist = Math.sqrt(d2);
+          const power = (1 - dist / splashR) * 4.0;   // 近いほど強く
+          p.vx += (dx / dist) * power;
+          p.vy += (dy / dist) * power * 0.6 + 0.5;    // 横優先＋少し下方向
+        }
+      }
+      // 滴下ごとに、陽イオンと陰イオンが飛ぶ方向（左右）をランダムに入れ替え
+      const splitDir = Math.random() < 0.5 ? -1 : 1;
+      ionizing.push(makeIonizing(cation, surfX - 14, surfY + 4, -splitDir));
+      ionizing.push(makeIonizing(anion,  surfX + 14, surfY + 4, +splitDir));
       // カウントは即時加算（棒グラフはすぐ伸びる）
       if (cation === 'Na+') counts.Nap++;
       if (cation === 'H+')  counts.Hp++;
@@ -790,7 +869,23 @@ function draw() {
       dropTotalCount++;
       drops.splice(i, 1);
       isDropping = false;
+      // 中和が落ち着いたタイミング (60フレーム後 ≒ 1秒後) でスナップショット
+      pendingSnapshot = { dropNo: dropTotalCount, framesLeft: 60 };
       updateGraphDOM();
+    }
+  }
+  // スナップショット予約処理：中和が落ち着いた頃に履歴追加
+  if (pendingSnapshot) {
+    pendingSnapshot.framesLeft--;
+    if (pendingSnapshot.framesLeft <= 0) {
+      history.push({
+        drop: pendingSnapshot.dropNo,
+        Hp: counts.Hp, OHm: counts.OHm, Clm: counts.Clm, Nap: counts.Nap,
+      });
+      // 履歴サイズ上限 (~30滴)
+      if (history.length > 32) history.shift();
+      drawLineGraph();
+      pendingSnapshot = null;
     }
   }
 
@@ -800,41 +895,91 @@ function draw() {
     z.age++;
     z.x += z.vx;
     z.y += z.vy;
-    z.vy += 0.05;                 // 軽い重力で液中へ落ちる
-    z.vx *= 0.96;
+    z.vy += 0.04;                 // 軽い重力で液中へ落ちる
+    z.vx *= 0.992;                // 横の勢いをほぼ保つ
     z.vy *= 0.97;
-    // 液中の境界
-    if (z.x < liqLeft() + 8)  { z.x = liqLeft() + 8;  z.vx *= -0.4; }
-    if (z.x > liqRight() - 8) { z.x = liqRight() - 8; z.vx *= -0.4; }
-    if (z.y > liqBottom() - 8){ z.y = liqBottom() - 8; z.vy *= -0.3; }
+    // 液中の境界（粒子半径分のpadで液面から出ない）
+    const zpad = ionRadius() + 2;
+    // 壁に到達したら止まる（反射で着水点に戻ってこない）
+    if (z.x < liqLeft() + zpad)  { z.x = liqLeft() + zpad;  z.vx = 0; }
+    if (z.x > liqRight() - zpad) { z.x = liqRight() - zpad; z.vx = 0; }
+    if (z.y < liqTop() + zpad)   { z.y = liqTop() + zpad;   z.vy *= -0.3; }
+    if (z.y > liqBottom() - zpad){ z.y = liqBottom() - zpad; z.vy *= -0.3; }
     if (z.age >= IONIZE_DURATION) {
-      // particlesに編入
-      particles.push(makeParticle(z.type, { x: z.x, y: z.y, fadeIn: 1 }));
+      // particlesに編入（その時の速度を引き継いで遠くへ広がる）
+      const p = makeParticle(z.type, { x: z.x, y: z.y, fadeIn: 1 });
+      p.vx = z.vx;
+      p.vy = z.vy;
+      particles.push(p);
       ionizing.splice(i, 1);
     }
   }
 
-  // 4) particles update（ブラウン運動）
+  // 4) particles update（ブラウン運動 + 粒子間反発）
+  // 4a) 粒子間反発 + H⁺×OH⁻ 引き合い
+  // 均等に散らばらせるため、反発半径を広めに取る
+  const repelR = ionRadius() * 3.4;
+  const repelR2 = repelR * repelR;
+  // H⁺×OH⁻ 引き合い半径を液体幅の70%まで広げる（離れた相手とも出会いやすくする）
+  const attractR = liqWidth() * 0.70;
+  const attractR2 = attractR * attractR;
+  for (let i = 0; i < particles.length; i++) {
+    const p1 = particles[i];
+    if (p1.fadeOut > 0) continue;
+    for (let j = i + 1; j < particles.length; j++) {
+      const p2 = particles[j];
+      if (p2.fadeOut > 0) continue;
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const d2 = dx*dx + dy*dy;
+      const isHpOh = (p1.type === 'H+'  && p2.type === 'OH-') ||
+                     (p1.type === 'OH-' && p2.type === 'H+');
+      if (isHpOh) {
+        // H⁺ と OH⁻ は引き合う（中和の確率を上げる）
+        if (d2 < attractR2 && d2 > 1) {
+          const d = Math.sqrt(d2);
+          const force = 0.10 * (1 - d / attractR);
+          const ux = dx / d, uy = dy / d;
+          p1.vx += ux * force;
+          p1.vy += uy * force;
+          p2.vx -= ux * force;
+          p2.vy -= uy * force;
+        }
+      } else {
+        // 同種・他の組み合わせ → 距離が近いほど反発（同種は弱め＝重なって見える許容）
+        const isSameType = p1.type === p2.type;
+        if (d2 < repelR2 && d2 > 0.01) {
+          const d = Math.sqrt(d2);
+          const overlap = 1 - d / repelR;
+          // 同種なら弱め（重なって透けて見える）、違う種なら強め
+          const force = isSameType ? overlap * overlap * 0.20 : overlap * overlap * 0.55;
+          const ux = dx / d, uy = dy / d;
+          p1.vx -= ux * force;
+          p1.vy -= uy * force;
+          p2.vx += ux * force;
+          p2.vy += uy * force;
+        }
+      }
+    }
+  }
+  // 4b) 個別更新
   for (const p of particles) {
     p.phase += 0.04;
-    p.vx += random(-0.06, 0.06);
-    p.vy += random(-0.06, 0.06);
-    p.vx *= 0.94;
-    p.vy *= 0.94;
-    p.vx = constrain(p.vx, -0.7, 0.7);
-    p.vy = constrain(p.vy, -0.7, 0.7);
+    p.vx += random(-0.10, 0.10);
+    p.vy += random(-0.10, 0.10);
+    p.vx *= 0.92;
+    p.vy *= 0.92;
+    p.vx = constrain(p.vx, -1.2, 1.2);
+    p.vy = constrain(p.vy, -1.2, 1.2);
     p.x += p.vx * speedMul;
     p.y += p.vy * speedMul;
-    // 軽く中心へ戻す（散らばりすぎ防止）+ 反応相手寄りに集まる傾向
-    const cx = (liqLeft() + liqRight()) / 2;
-    const cy = (liqTop() + liqBottom()) / 2;
-    p.x += (cx - p.x) * 0.0020;
-    p.y += (cy - p.y) * 0.0020;
-    // 壁
-    if (p.x < liqLeft() + 8)   { p.x = liqLeft() + 8;   p.vx *= -0.5; }
-    if (p.x > liqRight() - 8)  { p.x = liqRight() - 8;  p.vx *= -0.5; }
-    if (p.y < liqTop() + 8)    { p.y = liqTop() + 8;    p.vy *= -0.5; }
-    if (p.y > liqBottom() - 8) { p.y = liqBottom() - 8; p.vy *= -0.5; }
+    // 中心引き寄せは無し → 反発と壁で均等に分布
+    // 壁（粒子半径分のpadを取って液面から出ないようにする）
+    const pad = ionRadius() + 2;
+    if (p.x < liqLeft() + pad)   { p.x = liqLeft() + pad;   p.vx *= -0.5; }
+    if (p.x > liqRight() - pad)  { p.x = liqRight() - pad;  p.vx *= -0.5; }
+    if (p.y < liqTop() + pad)    { p.y = liqTop() + pad;    p.vy *= -0.5; }
+    if (p.y > liqBottom() - pad) { p.y = liqBottom() - pad; p.vy *= -0.5; }
   }
 
   // 5) 中和判定（最近傍ペア、1フレーム1ペア）
@@ -903,26 +1048,30 @@ function draw() {
 
 // --- 中和判定 ---
 function detectNeutralization() {
-  if (reacting.length > 4) return;   // 同時アニメ制限
-  const R = liqWidth() * 0.16;
+  if (reacting.length > 6) return;   // 同時アニメ制限
+  // 中和判定半径：液体幅の22%まで（広く＝出会いやすく）
+  const R = liqWidth() * 0.22;
   const R2 = R * R;
-  const hps = particles.filter(p => p.type === 'H+' && p.fadeOut === 0);
-  const ohs = particles.filter(p => p.type === 'OH-' && p.fadeOut === 0);
-  if (hps.length === 0 || ohs.length === 0) return;
-  let bestPair = null;
-  let bestD = R2;
-  for (const h of hps) {
-    for (const o of ohs) {
-      const dx = h.x - o.x;
-      const dy = h.y - o.y;
-      const d = dx*dx + dy*dy;
-      if (d < bestD) {
-        bestD = d;
-        bestPair = [h, o];
+  // 1フレームで最大2ペア検出（多すぎると一気に消えて学習効果が落ちる）
+  const MAX_PAIRS_PER_FRAME = 2;
+  for (let k = 0; k < MAX_PAIRS_PER_FRAME; k++) {
+    const hps = particles.filter(p => p.type === 'H+' && p.fadeOut === 0);
+    const ohs = particles.filter(p => p.type === 'OH-' && p.fadeOut === 0);
+    if (hps.length === 0 || ohs.length === 0) return;
+    let bestPair = null;
+    let bestD = R2;
+    for (const h of hps) {
+      for (const o of ohs) {
+        const dx = h.x - o.x;
+        const dy = h.y - o.y;
+        const d = dx*dx + dy*dy;
+        if (d < bestD) {
+          bestD = d;
+          bestPair = [h, o];
+        }
       }
     }
-  }
-  if (bestPair) {
+    if (!bestPair) return;
     const [h, o] = bestPair;
     h.fadeOut = 1; o.fadeOut = 1;
     h.reactPartner = o.id; o.reactPartner = h.id;
@@ -963,11 +1112,14 @@ function currentLiquidColorRGB() {
 }
 
 // --- ionizing helper ---
-function makeIonizing(type, x, y) {
+function makeIonizing(type, x, y, dirSign) {
+  // 滴下ごとに陽イオン/陰イオンの飛ぶ方向がランダム（左右どちらにも行く）
+  // dirSign は呼び出し元で決定（陽と陰は必ず逆方向）
+  const strength = random(2.2, 5.0);
   return {
     type, x, y,
-    vx: (type === 'Na+' || type === 'H+') ? random(-1.0, -0.2) : random(0.2, 1.0),
-    vy: random(0.2, 0.8),
+    vx: dirSign * strength,
+    vy: random(0.3, 1.0),
     age: 0,
   };
 }
@@ -1110,10 +1262,11 @@ function drawDrops() {
 }
 
 function drawParticles() {
-  for (const p of particles) {
-    // fadeOut: 中和開始のフラグ。reactingアニメ側で描画するのでここでは描かない
-    if (p.fadeOut > 0) continue;
-    drawIonAt(p.x, p.y, p.type, 1.0);
+  // 古い粒子から先に（奥に）描く → 新しい粒子が手前に重なって描かれる
+  const sorted = particles.slice().filter(p => p.fadeOut === 0).sort((a, b) => a.born - b.born);
+  for (const p of sorted) {
+    // 奥の同種粒子は半透明、手前ほどはっきり見せる
+    drawIonAt(p.x, p.y, p.type, 0.92);
   }
 }
 
@@ -1192,22 +1345,24 @@ function drawIonAt(x, y, type, alpha) {
   textStyle(NORMAL);
 }
 function drawH2OAt(x, y, alpha) {
-  const r = ionRadius() * 0.85;
-  // 中央の酸素（薄水色）と左右の水素（白）
+  const r = ionRadius() * 1.35;   // イオンより少し大きく見せる
   noStroke();
-  // 左右の水素
-  fill(255, 255, 255, 230 * alpha);
-  ellipse(x - r * 0.65, y - r * 0.25, r * 0.9, r * 0.9);
-  ellipse(x + r * 0.65, y - r * 0.25, r * 0.9, r * 0.9);
-  // 中央の酸素
-  fill(180, 220, 240, 240 * alpha);
-  ellipse(x, y + r * 0.15, r * 1.4, r * 1.4);
-  // ラベル
-  fill(60, 90, 120, 240 * alpha);
+  // 中央の酸素（薄水色）
+  fill(140, 200, 230, 240 * alpha);
+  ellipse(x, y + r * 0.15, r * 2.0, r * 2.0);
+  // 左右の水素（白）
+  fill(255, 255, 255, 240 * alpha);
+  stroke(140, 200, 230, 200 * alpha);
+  strokeWeight(1.2);
+  ellipse(x - r * 0.80, y - r * 0.40, r * 1.20, r * 1.20);
+  ellipse(x + r * 0.80, y - r * 0.40, r * 1.20, r * 1.20);
+  noStroke();
+  // ラベル（中央の酸素の上）
+  fill(40, 70, 100, 250 * alpha);
   textAlign(CENTER, CENTER);
-  textSize(r * 0.8);
+  textSize(r * 0.85);
   textStyle(BOLD);
-  text('H₂O', x, y + r * 0.15);
+  text('H₂O', x, y + r * 0.18);
   textStyle(NORMAL);
 }
 
@@ -1217,7 +1372,6 @@ function drawH2OAt(x, y, alpha) {
 function tryStartDrop() {
   if (isDropping) return;
   if (drops.length > 0) return;
-  // 「最大15粒オーダー」の安全弁
   if (counts.Hp + counts.OHm + counts.Clm + counts.Nap > 60) return;
   const parent = (mode === 'hcl-base') ? 'NaOH' : 'HCl';
   drops.push({ t: 0, parent });
@@ -1239,6 +1393,106 @@ function setBar(key, val) {
   if (fill) fill.style.height = Math.min(100, (val / BAR_MAX) * 100) + '%';
   if (num)  num.textContent = val;
 }
+function drawLineGraph() {
+  const cv = document.getElementById('line-graph-canvas');
+  if (!cv) return;
+  // 表示サイズ（CSS）と内部解像度を合わせる（高解像度対応）
+  const rect = cv.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  if (cv.width !== rect.width * dpr || cv.height !== rect.height * dpr) {
+    cv.width  = Math.max(1, Math.round(rect.width * dpr));
+    cv.height = Math.max(1, Math.round(rect.height * dpr));
+  }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width;
+  const H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // 余白
+  const padL = 22, padR = 6, padT = 6, padB = 18;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  // 軸の最大値（縦は 1.2倍 で常時調整、最低 8）
+  let maxY = 8;
+  for (const h of history) {
+    maxY = Math.max(maxY, h.Hp, h.OHm, h.Clm, h.Nap);
+  }
+  maxY = Math.max(8, Math.ceil(maxY * 1.15));
+  const maxX = Math.max(10, history.length === 0 ? 10 : history[history.length - 1].drop + 1);
+
+  // 背景の薄いグリッド
+  ctx.strokeStyle = 'rgba(180,160,120,0.20)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 4; i++) {
+    const y = padT + (plotH * i / 4);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+  }
+
+  // 軸
+  ctx.strokeStyle = '#8a7a60';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT);
+  ctx.lineTo(padL, padT + plotH);
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.stroke();
+
+  // 軸ラベル
+  ctx.fillStyle = '#8a7a60';
+  ctx.font = '10px "M PLUS Rounded 1c", system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('0', padL - 3, padT + plotH);
+  ctx.fillText(String(maxY), padL - 3, padT);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const xLabel = (mode === 'hcl-base') ? 'NaOHを加えた量（滴）' : 'HClを加えた量（滴）';
+  ctx.fillText(xLabel, padL + plotW / 2, padT + plotH + 3);
+  ctx.save();
+  ctx.translate(8, padT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('イオンの数', 0, 0);
+  ctx.restore();
+
+  // 折れ線4本
+  const lines = [
+    { key: 'Hp',  color: getCSSVar('--ion-h')  },
+    { key: 'Clm', color: getCSSVar('--ion-cl') },
+    { key: 'OHm', color: getCSSVar('--ion-oh') },
+    { key: 'Nap', color: getCSSVar('--ion-na') },
+  ];
+  for (const ln of lines) {
+    ctx.strokeStyle = ln.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    history.forEach((pt, i) => {
+      const x = padL + (pt.drop / maxX) * plotW;
+      const y = padT + plotH - (pt[ln.key] / maxY) * plotH;
+      if (i === 0) ctx.moveTo(x, y);
+      else         ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // 点も打つ
+    ctx.fillStyle = ln.color;
+    history.forEach(pt => {
+      const x = padL + (pt.drop / maxX) * plotW;
+      const y = padT + plotH - (pt[ln.key] / maxY) * plotH;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+}
+function getCSSVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#000';
+}
+
 function updateStatusDOM() {
   const dc = document.getElementById('drop-count');
   if (dc) dc.textContent = dropTotalCount;
