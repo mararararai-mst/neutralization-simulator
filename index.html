@@ -25,6 +25,7 @@
   --ion-na: #E8A040;   /* Na+ 橙 */
   --ion-oh: #5FA8D8;   /* OH- 青 */
   --ion-cl: #6FB89A;   /* Cl- 緑 */
+  --ion-so4:#9C6BD1;   /* SO4²- 紫 */
   --grid: rgba(180, 160, 120, 0.12);
 }
 * { box-sizing: border-box; }
@@ -391,7 +392,7 @@ header.title .sub {
 .mode-toggle button {
   background: transparent;
   border: none;
-  padding: 8px 18px;
+  padding: 6px 12px;
   font-family: inherit;
   font-weight: 700;
   font-size: 14px;
@@ -652,10 +653,12 @@ sub, sup { font-size: 0.72em; }
 
   <div class="controls">
     <div class="mode-toggle" role="tablist" aria-label="モード">
-      <button id="mode-hcl" class="active" role="tab" aria-selected="true">🧪 HCl + NaOH</button>
-      <button id="mode-naoh" role="tab" aria-selected="false">🧪 NaOH + HCl</button>
+      <button id="mode-hcl"        class="active" data-mode="hcl-base"   role="tab">🧪 HCl + NaOH</button>
+      <button id="mode-naoh"                       data-mode="naoh-base"  role="tab">🧪 NaOH + HCl</button>
+      <button id="mode-h2so4"                      data-mode="h2so4-base" role="tab">🧪 H₂SO₄ + NaOH</button>
+      <button id="mode-naoh-h2so4"                 data-mode="naoh-h2so4" role="tab">🧪 NaOH + H₂SO₄</button>
     </div>
-    <button id="drop-btn" class="btn primary">💧 NaOHを1滴 加える</button>
+    <button id="drop-btn" class="btn primary">💧 1滴 加える</button>
     <button id="auto-btn" class="btn auto-btn">⏩ 連続で加える</button>
     <button id="reset-btn" class="btn">↻ はじめに戻す</button>
     <div class="slider-wrap">
@@ -677,7 +680,7 @@ let drops = [];          // 落下中の滴
 let ionizing = [];       // 着水→電離中（particlesに編入されるまで）
 let reacting = [];       // H⁺+OH⁻→H₂O アニメ中
 let waters = [];         // 生成済みH₂O（演出のみ、カウント外）
-let counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0 };
+let counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0, SO4m: 0 };
 let btbLerp = 1;         // -1(青) .. 0(緑) .. +1(黄)
 let isDropping = false;
 let autoDrop = false;
@@ -692,26 +695,24 @@ let canvasW = 800, canvasH = 500;
 // history[i] = { drop: i, Hp, OHm, Clm, Nap }
 let history = [];
 // 折れ線グラフ：各イオンの表示ON/OFF
-let lineGraphVisible = { Hp: true, Clm: true, OHm: true, Nap: true };
+let lineGraphVisible = { Hp: true, Anion: true, OHm: true, Nap: true };
 
-// 滴下数 n からのイオン数の理論値（プリント①と完全一致のグラフを描くため）
+// 滴下数 n からのイオン数の理論値（プリントと完全一致のグラフを描くため）
+// 各モード:
+//   hcl-base   : H+×5 Cl-×5 → NaOH n滴 ⇒ Na++n OH-:n滴超 H+:5-n
+//   naoh-base  : Na+×5 OH-×5 → HCl  n滴 ⇒ H+:n超 Cl-+n
+//   h2so4-base : H+×6 SO4²⁻×3 → NaOH n滴 ⇒ Na++n OH-:n滴超 H+:6-n
+//   naoh-h2so4 : Na+×6 OH-×6 → H2SO4 n滴(2H+ +SO4²⁻) ⇒ H+:2n超 SO4²⁻+n
 function expectedCountsAt(dropNo) {
-  if (mode === 'hcl-base') {
-    // 初期 H+=5, Cl-=5; NaOH 1滴で Na++1, OH-+1, そして H+ と中和（H+>=1 のあいだ）
-    return {
-      Hp:  Math.max(0, 5 - dropNo),
-      Clm: 5,
-      OHm: Math.max(0, dropNo - 5),
-      Nap: dropNo,
-    };
-  } else {
-    // 初期 OH-=5, Na+=5; HCl 1滴で H++1, Cl-+1, そして OH- と中和
-    return {
-      Hp:  Math.max(0, dropNo - 5),
-      Clm: dropNo,
-      OHm: Math.max(0, 5 - dropNo),
-      Nap: 5,
-    };
+  switch(mode) {
+    case 'hcl-base':
+      return { Hp:  Math.max(0, 5 - dropNo), Clm: 5, OHm: Math.max(0, dropNo - 5), Nap: dropNo, SO4m: 0 };
+    case 'naoh-base':
+      return { Hp:  Math.max(0, dropNo - 5), Clm: dropNo, OHm: Math.max(0, 5 - dropNo), Nap: 5, SO4m: 0 };
+    case 'h2so4-base':
+      return { Hp:  Math.max(0, 6 - dropNo), Clm: 0, OHm: Math.max(0, dropNo - 6), Nap: dropNo, SO4m: 3 };
+    case 'naoh-h2so4':
+      return { Hp:  Math.max(0, 2*dropNo - 6), Clm: 0, OHm: Math.max(0, 6 - 2*dropNo), Nap: 6, SO4m: dropNo };
   }
 }
 
@@ -738,11 +739,21 @@ const BTB_ACID    = [255, 230, 90];
 const BTB_NEUTRAL = [140, 210, 130];
 const BTB_ALKALI  = [110, 170, 230];
 const ION_COLORS = {
-  'H+':  [224, 122, 106],
-  'Na+': [232, 160, 64],
-  'OH-': [95, 168, 216],
-  'Cl-': [111, 184, 154],
+  'H+':   [224, 122, 106],
+  'Na+':  [232, 160, 64],
+  'OH-':  [95, 168, 216],
+  'Cl-':  [111, 184, 154],
+  'SO42-':[156, 107, 209],
 };
+
+// 4モードの仕様
+const MODE_SPEC = {
+  'hcl-base':     { beakerKind:'acid',  dropKind:'alkali', acid:'HCl',   alkali:'NaOH', acidIons:[{type:'H+',n:1},{type:'Cl-',n:1}],   alkaliIons:[{type:'Na+',n:1},{type:'OH-',n:1}], initialHpCount:5, initialOHmCount:5, beakerLabel:'うすい塩酸（HCl水溶液）＋BTB', pipetteLabel:'NaOH', tubeRGB:[110,170,230] },
+  'naoh-base':    { beakerKind:'alkali',dropKind:'acid',   acid:'HCl',   alkali:'NaOH', acidIons:[{type:'H+',n:1},{type:'Cl-',n:1}],   alkaliIons:[{type:'Na+',n:1},{type:'OH-',n:1}], initialHpCount:5, initialOHmCount:5, beakerLabel:'水酸化ナトリウム水溶液（NaOH）＋BTB', pipetteLabel:'HCl', tubeRGB:[255,230,90] },
+  'h2so4-base':   { beakerKind:'acid',  dropKind:'alkali', acid:'H2SO4', alkali:'NaOH', acidIons:[{type:'H+',n:2},{type:'SO42-',n:1}],alkaliIons:[{type:'Na+',n:1},{type:'OH-',n:1}], initialHpCount:6, initialOHmCount:6, beakerLabel:'うすい硫酸（H₂SO₄水溶液）＋BTB', pipetteLabel:'NaOH', tubeRGB:[110,170,230] },
+  'naoh-h2so4':   { beakerKind:'alkali',dropKind:'acid',   acid:'H2SO4', alkali:'NaOH', acidIons:[{type:'H+',n:2},{type:'SO42-',n:1}],alkaliIons:[{type:'Na+',n:1},{type:'OH-',n:1}], initialHpCount:6, initialOHmCount:6, beakerLabel:'水酸化ナトリウム水溶液（NaOH）＋BTB', pipetteLabel:'H₂SO₄', tubeRGB:[255,230,90] },
+};
+function spec() { return MODE_SPEC[mode]; }
 
 // --- 初期化 ---
 function setup() {
@@ -797,38 +808,44 @@ function initStateForMode() {
   waters = [];
   dropTotalCount = 0;
   history = [];
-  if (mode === 'hcl-base') {
-    counts = { Hp: 5, OHm: 0, Clm: 5, Nap: 0 };
-    btbLerp = 1;
-    placeInitialParticles(['H+', 'Cl-']);
-  } else {
-    counts = { Hp: 0, OHm: 5, Clm: 0, Nap: 5 };
-    btbLerp = -1;
-    placeInitialParticles(['OH-', 'Na+']);
+  const e = expectedCountsAt(0);
+  counts = { Hp: e.Hp, OHm: e.OHm, Clm: e.Clm, Nap: e.Nap, SO4m: e.SO4m };
+  // BTB：酸性スタートなら +1、アルカリ性スタートなら -1
+  btbLerp = (counts.Hp > counts.OHm) ? 1 : -1;
+  // 初期粒子配置（mode別）
+  switch(mode) {
+    case 'hcl-base':    placeInitialParticles(['H+', 'Cl-'], [5,5]); break;
+    case 'naoh-base':   placeInitialParticles(['OH-', 'Na+'], [5,5]); break;
+    case 'h2so4-base':  placeInitialParticles(['H+', 'SO42-'], [6,3]); break;
+    case 'naoh-h2so4':  placeInitialParticles(['OH-', 'Na+'], [6,6]); break;
   }
-  // 折れ線グラフに「滴下0」の理論値
-  history.push({ drop: 0, ...expectedCountsAt(0) });
-  // 棒グラフ + 折れ線即時反映
+  history.push({ drop: 0, ...e });
   updateGraphDOM();
   drawLineGraph();
   updateStatusDOM();
+  // 1滴ボタンのラベルを spec に合わせて更新
+  const sp = spec();
+  const dropBtn = document.getElementById('drop-btn');
+  if (dropBtn) {
+    const reagent = (sp.dropKind === 'alkali') ? sp.alkali : sp.acid;
+    dropBtn.textContent = `💧 ${reagent.replace('H2SO4','H₂SO₄')}を1滴 加える`;
+  }
 }
 
-// 初期5×2粒子を液体内にグリッド状に均等配置
-function placeInitialParticles(types) {
-  // 5 粒子ずつ × 2 種類 = 10 粒。横5列・縦2行のグリッドにイオン種をシャッフル配置
-  const cols = 5, rows = 2;
+// イオンを液体内に均等配置（種ごとに行を分ける）
+// types: ['H+', 'Cl-'] のような陽・陰イオン2種類
+// counts: それぞれの個数 [count1, count2]
+function placeInitialParticles(types, countsArr) {
   const pad = ionRadius() + 6;
-  const xs = [];
-  const ys = [];
-  for (let c = 0; c < cols; c++) xs.push(lerp(liqLeft() + pad, liqRight() - pad, (c + 0.5) / cols));
-  for (let r = 0; r < rows; r++) ys.push(lerp(liqTop() + pad, liqBottom() - pad, (r + 0.5) / rows));
-  // 種ごとに別の行に配置（型A は上の行、型B は下の行）
-  for (let c = 0; c < cols; c++) {
-    const jitterA = { x: random(-12, 12), y: random(-8, 8) };
-    const jitterB = { x: random(-12, 12), y: random(-8, 8) };
-    particles.push(makeParticle(types[0], { x: xs[c] + jitterA.x, y: ys[0] + jitterA.y }));
-    particles.push(makeParticle(types[1], { x: xs[c] + jitterB.x, y: ys[1] + jitterB.y }));
+  for (let ti = 0; ti < types.length; ti++) {
+    const t = types[ti];
+    const n = countsArr[ti];
+    const rowY = lerp(liqTop() + pad, liqBottom() - pad, (ti + 0.5) / types.length);
+    for (let c = 0; c < n; c++) {
+      const x = lerp(liqLeft() + pad, liqRight() - pad, (c + 0.5) / n);
+      const jx = random(-10, 10), jy = random(-8, 8);
+      particles.push(makeParticle(t, { x: x + jx, y: rowY + jy }));
+    }
   }
 }
 
@@ -873,10 +890,11 @@ function draw() {
     d.t += DROP_SPEED * speedMul;
     if (d.t >= 1) {
       // 着水 → 既存粒子を外側に押しのける（場所を空ける）
-      const [cation, anion] = (d.parent === 'NaOH') ? ['Na+', 'OH-'] : ['H+', 'Cl-'];
+      // 1滴で「滴下する側」の物質1分子分のイオン群を入れる（例: H2SO4 = 2H+ + SO4²-）
+      const sp = spec();
+      const ionsToAdd = (d.parent === sp.alkali) ? sp.alkaliIons : sp.acidIons;
       const surfX = LAYOUT.pipetteX * canvasW;
       const surfY = liquidSurfaceY();
-      // 着水点付近の既存粒子に外向き衝撃を与える（液面に円形の波紋のように）
       const splashR = liqWidth() * 0.30;
       for (const p of particles) {
         if (p.fadeOut > 0) continue;
@@ -885,20 +903,29 @@ function draw() {
         const d2 = dx*dx + dy*dy;
         if (d2 < splashR * splashR && d2 > 1) {
           const dist = Math.sqrt(d2);
-          const power = (1 - dist / splashR) * 4.0;   // 近いほど強く
+          const power = (1 - dist / splashR) * 4.0;
           p.vx += (dx / dist) * power;
-          p.vy += (dy / dist) * power * 0.6 + 0.5;    // 横優先＋少し下方向
+          p.vy += (dy / dist) * power * 0.6 + 0.5;
         }
       }
-      // 滴下ごとに、陽イオンと陰イオンが飛ぶ方向（左右）をランダムに入れ替え
-      const splitDir = Math.random() < 0.5 ? -1 : 1;
-      ionizing.push(makeIonizing(cation, surfX - 14, surfY + 4, -splitDir));
-      ionizing.push(makeIonizing(anion,  surfX + 14, surfY + 4, +splitDir));
-      // カウントは即時加算（棒グラフはすぐ伸びる）
-      if (cation === 'Na+') counts.Nap++;
-      if (cation === 'H+')  counts.Hp++;
-      if (anion === 'OH-')  counts.OHm++;
-      if (anion === 'Cl-')  counts.Clm++;
+      // イオン群を放射状に展開
+      const splitDir0 = Math.random() < 0.5 ? -1 : 1;
+      let added = 0;
+      ionsToAdd.forEach(io => {
+        const isCation = (io.type === 'H+' || io.type === 'Na+');
+        for (let k = 0; k < io.n; k++) {
+          const dir = isCation ? -splitDir0 : +splitDir0;
+          const offsetX = (added % 2 === 0 ? -1 : 1) * (14 + (added>>1) * 4);
+          ionizing.push(makeIonizing(io.type, surfX + offsetX, surfY + 4, dir));
+          // カウント即時加算
+          if (io.type === 'H+')   counts.Hp++;
+          if (io.type === 'Na+')  counts.Nap++;
+          if (io.type === 'OH-')  counts.OHm++;
+          if (io.type === 'Cl-')  counts.Clm++;
+          if (io.type === 'SO42-')counts.SO4m++;
+          added++;
+        }
+      });
       dropTotalCount++;
       drops.splice(i, 1);
       isDropping = false;
@@ -1206,8 +1233,7 @@ function drawBeakerLabel() {
   textAlign(CENTER, TOP);
   textSize(Math.max(11, canvasW / 80));
   textStyle(BOLD);
-  const label = (mode === 'hcl-base') ? 'うすい塩酸（HCl水溶液）＋BTB' : '水酸化ナトリウム水溶液（NaOH）＋BTB';
-  text(label, bx + bw / 2, by + bh + 4);
+  text(spec().beakerLabel, bx + bw / 2, by + bh + 4);
   textStyle(NORMAL);
 }
 
@@ -1221,9 +1247,9 @@ function drawPipette() {
   const bulbR = 14;
   const bulbCy = tipY - pipBodyH - bulbR;
   // 液体内容物の色（モードに依存）
-  const tubeColor = (mode === 'hcl-base') ? [110, 170, 230] : [255, 230, 90];  // 入れる側
-  // 連れて入れる試薬名
-  const reagent = (mode === 'hcl-base') ? 'NaOH' : 'HCl';
+  const sp = spec();
+  const tubeColor = sp.tubeRGB;
+  const reagent = sp.pipetteLabel;
   // ゴム球
   noStroke();
   fill(232, 200, 90);
@@ -1271,7 +1297,7 @@ function drawDrops() {
     const endY = liquidSurfaceY() - 4;
     const x = startX;
     const y = lerp(startY, endY, d.t);
-    const [r, g, b] = (d.parent === 'NaOH') ? [110, 170, 230] : [255, 220, 80];
+    const [r, g, b] = spec().tubeRGB;
     noStroke();
     fill(r, g, b, 240);
     // 滴の形（楕円＋先端）
@@ -1393,8 +1419,9 @@ function drawH2OAt(x, y, alpha) {
 function tryStartDrop() {
   if (isDropping) return;
   if (drops.length > 0) return;
-  if (counts.Hp + counts.OHm + counts.Clm + counts.Nap > 60) return;
-  const parent = (mode === 'hcl-base') ? 'NaOH' : 'HCl';
+  if (counts.Hp + counts.OHm + counts.Clm + counts.Nap + counts.SO4m > 80) return;
+  const sp = spec();
+  const parent = (sp.dropKind === 'alkali') ? sp.alkali : sp.acid;
   drops.push({ t: 0, parent });
   isDropping = true;
 }
@@ -1404,9 +1431,26 @@ function tryStartDrop() {
 // ==========================================
 function updateGraphDOM() {
   setBar('hp',  counts.Hp);
-  setBar('clm', counts.Clm);
+  // 2番目のスロット：HCl系=Cl⁻、H2SO4系=SO4²⁻
+  const useSO4 = (mode === 'h2so4-base' || mode === 'naoh-h2so4');
+  setBar('clm', useSO4 ? counts.SO4m : counts.Clm);
   setBar('ohm', counts.OHm);
   setBar('nap', counts.Nap);
+  // ラベルと色の動的切替
+  const lab = document.querySelector('.bar-label.clm');
+  const fill = document.getElementById('bar-clm');
+  const swatch = document.querySelector('.graph-legend .lg.clm .swatch') || document.querySelector('.graph-legend .lg:nth-child(2) .swatch');
+  const legendText = document.querySelector('.graph-legend .lg:nth-child(2)');
+  if (lab) {
+    lab.innerHTML = useSO4 ? 'SO<span style="font-size:0.7em;">4</span><span style="font-size:0.7em;vertical-align:super;">2−</span>' : 'Cl⁻';
+    lab.style.color = useSO4 ? getCSSVar('--ion-so4') : '';
+  }
+  if (fill) fill.style.background = useSO4 ? getCSSVar('--ion-so4') : getCSSVar('--ion-cl');
+  if (swatch) swatch.style.background = useSO4 ? getCSSVar('--ion-so4') : getCSSVar('--ion-cl');
+  if (legendText) {
+    const span = legendText.querySelector('span:last-child');
+    if (span) span.innerHTML = useSO4 ? 'SO₄²⁻' : 'Cl⁻';
+  }
 }
 function setBar(key, val) {
   const fill = document.getElementById('bar-' + key);
@@ -1472,7 +1516,7 @@ function drawLineGraph() {
   ctx.fillText(String(maxY), padL - 3, padT);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  const xLabel = (mode === 'hcl-base') ? 'NaOHを加えた量（滴）' : 'HClを加えた量（滴）';
+  const xLabel = (spec().dropKind === 'alkali' ? spec().alkali : spec().acid) + 'を加えた量（滴）';
   ctx.fillText(xLabel, padL + plotW / 2, padT + plotH + 3);
   ctx.save();
   ctx.translate(8, padT + plotH / 2);
@@ -1481,12 +1525,15 @@ function drawLineGraph() {
   ctx.fillText('イオンの数', 0, 0);
   ctx.restore();
 
-  // 折れ線4本（凡例ボタンでON/OFF切替）
+  // 折れ線4本（モードに応じて陰イオンを Cl⁻ or SO₄²⁻ に切替）
+  const useSO4 = (mode === 'h2so4-base' || mode === 'naoh-h2so4');
+  const anionKey   = useSO4 ? 'SO4m' : 'Clm';
+  const anionColor = useSO4 ? getCSSVar('--ion-so4') : getCSSVar('--ion-cl');
   const lines = [
-    { key: 'Hp',  color: getCSSVar('--ion-h')  },
-    { key: 'Clm', color: getCSSVar('--ion-cl') },
-    { key: 'OHm', color: getCSSVar('--ion-oh') },
-    { key: 'Nap', color: getCSSVar('--ion-na') },
+    { key: 'Hp',     color: getCSSVar('--ion-h')  },
+    { key: anionKey, color: anionColor },
+    { key: 'OHm',    color: getCSSVar('--ion-oh') },
+    { key: 'Nap',    color: getCSSVar('--ion-na') },
   ];
   for (const ln of lines) {
     if (!lineGraphVisible[ln.key]) continue;
@@ -1541,8 +1588,10 @@ function updateStatusDOM() {
 // ==========================================
 function bindUI() {
   // モード切替
-  document.getElementById('mode-hcl').addEventListener('click', () => switchMode('hcl-base'));
-  document.getElementById('mode-naoh').addEventListener('click', () => switchMode('naoh-base'));
+  // 全モードボタンを data-mode で一律バインド
+  document.querySelectorAll('.mode-toggle button[data-mode]').forEach(b => {
+    b.addEventListener('click', () => switchMode(b.dataset.mode));
+  });
   // 1滴ボタン
   document.getElementById('drop-btn').addEventListener('click', () => {
     tryStartDrop();
@@ -1610,11 +1659,15 @@ function toggleOverlay(which) {
 function switchMode(newMode) {
   if (newMode === mode) return;
   mode = newMode;
-  document.getElementById('mode-hcl').classList.toggle('active', mode === 'hcl-base');
-  document.getElementById('mode-naoh').classList.toggle('active', mode === 'naoh-base');
+  // 全ボタンの active を data-mode で同期
+  document.querySelectorAll('.mode-toggle button[data-mode]').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
   // 1滴ボタンのラベル更新
+  const sp = spec();
   const dropBtn = document.getElementById('drop-btn');
-  dropBtn.textContent = (mode === 'hcl-base') ? '💧 NaOHを1滴 加える' : '💧 HClを1滴 加える';
+  const reagent = (sp.dropKind === 'alkali') ? sp.alkali : sp.acid;
+  dropBtn.textContent = `💧 ${reagent.replace('H2SO4','H₂SO₄')}を1滴 加える`;
   // 連続滴下も止める
   autoDrop = false;
   const autoBtn = document.getElementById('auto-btn');
